@@ -11,3 +11,11 @@ export interface WaremaWMSFrameName extends WaremaWMSFrame {
 export interface WaremaWMSFrameVersion extends WaremaWMSFrame {
     version: string
 }
+
+export interface WaremaWMSMessage {
+    serial: string
+}
+
+export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
+    windSpeed: number
+}

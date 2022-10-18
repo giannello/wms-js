@@ -53,6 +53,10 @@ class WaremaWMSMock {
         }
         this.mockedPort.port?.emitData(`{${response}}`);
     }
+
+    mockWeatherBroadcast(serial: string, windSpeed: string): void {
+        this.mockedPort.port?.emitData(`{r${serial}7080FF${windSpeed}FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}`);
+    }
 }
 
 export default WaremaWMSMock;
