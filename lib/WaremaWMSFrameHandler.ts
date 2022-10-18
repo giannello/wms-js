@@ -1,7 +1,13 @@
 import {DelimiterParser, SerialPort} from "serialport";
 import {EventEmitter, once} from 'node:events';
 import {setTimeout} from "timers/promises";
-import type {WaremaWMSFrameAck, WaremaWMSFrameName, WaremaWMSFrameVersion} from "./WaremaWMSFrame";
+import type {
+    WaremaWMSFrameAck,
+    WaremaWMSFrameName,
+    WaremaWMSFrameVersion,
+    WaremaWMSMessageBroadcastWeather,
+} from "./WaremaWMSFrame";
+import WaremaWMSUtils from "./WaremaWMSUtils.js";
 
 interface WaremaWMSFrameHandlerOptions {
     serialPort: SerialPort
@@ -27,8 +33,11 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_TYPE_NAME_REQUEST = 'G';
     static readonly FRAME_TYPE_NAME_RESPONSE = 'g';
     static readonly FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST = 'M';
+    static readonly FRAME_TYPE_MESSAGE_RESPONSE = 'r';
     static readonly FRAME_TYPE_VERSION_REQUEST = 'V';
     static readonly FRAME_TYPE_VERSION_RESPONSE = 'v';
+
+    static readonly MESSAGE_TYPE_BROADCAST_WEATHER = '7080'
 
     readonly serialPort;
 
@@ -57,7 +66,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
         // Parse the frame, split `type` and `payload`
         const frameType = frame.slice(1, 2);
         const framePayload = frame.slice(2, -1);
-        const emitType = frameType;
+        let emitType = frameType;
         let emitPayload = {};
         switch (frameType) {
             case WaremaWMSFrameHandler.FRAME_TYPE_ACK:
@@ -71,6 +80,24 @@ class WaremaWMSFrameHandler extends EventEmitter {
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_RESPONSE:
                 emitPayload = <WaremaWMSFrameVersion>{
                     version: framePayload.trim()
+                }
+                break;
+            case WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_RESPONSE:
+                const serial = framePayload.slice(0, 6);
+                const messageType = framePayload.slice(6, 10);
+                const messagePayload = framePayload.slice(10);
+                emitType = messageType;
+                switch (messageType) {
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER:
+                        // TODO: implement missing message fields
+                        emitPayload = <WaremaWMSMessageBroadcastWeather>{
+                            serial,
+                            windSpeed: WaremaWMSUtils.hexToDec(messagePayload.slice(2, 4)),
+                        }
+                        break
+                    /* c8 ignore next 2 */
+                    default:
+                        throw new Error(`Cannot handle. Unknown message type for frame: ${frame.toString()}`);
                 }
                 break;
             /* c8 ignore next 2 */

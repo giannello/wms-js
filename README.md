@@ -8,6 +8,7 @@ A JavaScript interface to a [Warema WMS network](https://www.warema.com/en/contr
 ```typescript
 import {SerialPort} from "serialport";
 import WaremaWMS from "./lib/WaremaWMS.js";
+import WaremaWMSFrameHandler from "./lib/WaremaWMSFrameHandler.js";
 
 const port = new SerialPort({
     path: '/dev/ttyUSB0',
@@ -19,6 +20,7 @@ console.log(wms.getName());
 console.log(wms.getVersion());
 console.log(await wms.configureNetwork(11, 'ABCD'));
 console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
+wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
 ```
 
 ## Protocol details
@@ -96,3 +98,55 @@ The following frame types are known:
 ```
 
 * `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` 32-character, hex encryption key
+
+#### Network message request/response
+
+```
+-> {R TT XXXXXX YYYY ZZZ[...]}
+<- {r XXXXXX YYYY ZZZ[...]}
+```
+
+* `TT` is some kind of type identifier added to outgoing messages only
+* `XXXXXX` is the source serial number
+* `YYYY` is the message type
+* `ZZZ[...]` is the message payload
+
+### Network message structure
+
+Messages contain data travelling between devices of the WMS network.
+Messages are embedded within `R`/`r` frames, and can be of different types.
+
+The following message types are known:
+
+| Message type | Content                   |
+|:------------:|---------------------------|
+|    `7080`    | Weather station broadcast |
+
+#### Weather station broadcast
+
+```
+<- {r XXXXXX 7080 YY WW L1 ZZZZZZ L2 xx RR TT yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy}
+// the followings are actual message received from 2 different weather stations
+    r ABCDEF 7080 00 00 10 FFFFFF FA C8 FF FF FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    r ABCDEF 7080 00 01 1A FFFFFF FA C8 FF FF FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    r ABCDEF 7080 00 00 00 FFFFFF 00 C7 FF FF FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+```
+
+* `YY` unknown
+* `WW` wind speed (hex)
+* `L1` illuminance 1, needs processing
+* `ZZZZZZ` unknown
+* `L2` illuminance 2, needs processing
+* `xx` unknown
+* `RR` rain (`00` = no rain, `C8` = rain)
+* `TT` temperature, needs processing
+* `yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy` unknown
+
+According to the forum, the following post-processing is needed:
+
+* temperature: convert to dec, divide by 2, and subtract 35
+* illuminance
+    * if `L1` is `00`, the illuminance value is `L2`, converted to dec, multiplied by 2
+    * otherwise, convert both `L1` and `L2` to dec, multiply them and then multiply by 2
+
+Given the mismatch between the documentation and the sample messages, only wind speed is currently implemented
