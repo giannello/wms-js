@@ -19,7 +19,13 @@
     "url": "https://github.com/giannello/warema-wms.git"
   },
   "type": "module",
+  "scripts": {
+    "test": "NODE_OPTIONS='--loader ts-node/esm' c8 cucumber-js",
+    "test-debug": "NODE_OPTIONS='--loader ts-node/esm --inspect-brk=0.0.0.0' cucumber-js",
+    "test-watch": "NODE_OPTIONS='--loader ts-node/esm' nodemon --exec c8 cucumber-js"
+  },
   "devDependencies": {
+    "@cucumber/cucumber": "8.7.0",
     "@tsconfig/node16-strictest-esm": "1.0.3",
     "c8": "7.12.0",
     "nodemon": "2.0.20",
