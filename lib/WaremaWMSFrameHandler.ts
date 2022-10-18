@@ -1,7 +1,7 @@
 import {DelimiterParser, SerialPort} from "serialport";
 import {EventEmitter, once} from 'node:events';
 import {setTimeout} from "timers/promises";
-import type {WaremaWMSFrameName} from "./WaremaWMSFrame";
+import type {WaremaWMSFrameName, WaremaWMSFrameVersion} from "./WaremaWMSFrame";
 
 interface WaremaWMSFrameHandlerOptions {
     serialPort: SerialPort
@@ -20,6 +20,8 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_TYPE_ACK = 'a';
     static readonly FRAME_TYPE_NAME_REQUEST = 'G';
     static readonly FRAME_TYPE_NAME_RESPONSE = 'g';
+    static readonly FRAME_TYPE_VERSION_REQUEST = 'V';
+    static readonly FRAME_TYPE_VERSION_RESPONSE = 'v';
 
     readonly serialPort;
 
@@ -56,6 +58,11 @@ class WaremaWMSFrameHandler extends EventEmitter {
                     name: framePayload
                 }
                 break;
+            case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_RESPONSE:
+                emitPayload = <WaremaWMSFrameVersion>{
+                    version: framePayload.trim()
+                }
+                break;
             /* c8 ignore next 2 */
             default:
                 throw new Error(`Cannot handle. Unknown frame type for frame: ${frame.toString()}`);
@@ -74,6 +81,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
         switch (frameType) {
             case WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST}`;
+                break;
+            case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
                 break;
             /* c8 ignore next 2 */
             default:

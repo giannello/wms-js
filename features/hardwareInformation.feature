@@ -8,3 +8,7 @@ Feature: Hardware information
     Scenario: ask for the stick name
       When I ask for the stick name
       Then the stick responds with "Mock WMS USB-Stick"
+
+    Scenario: ask for the stick version
+      When I ask for the stick version
+      Then the stick responds with "12345678"
