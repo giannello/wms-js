@@ -17,6 +17,7 @@ const port = new SerialPort({
 const wms = new WaremaWMS(port);
 console.log(wms.getName());
 console.log(wms.getVersion());
+console.log(await wms.configureNetwork(11, 'ABCD'));
 ```
 
 ## Protocol details
@@ -74,3 +75,14 @@ The following frame types are known:
 * `XXXXXXXX` is the version reported by the stick. It's not known whether there are multiple versions, or if it's
   possible to upgrade
 * `___` are blank spaces in the response
+
+#### Stick network parameters configuration
+
+```
+-> {M X CC PPPP}
+<- {a}
+```
+
+* `X` can be either `%` or `#`, depending on whether we want to receive network broadcast messages, or not.
+* `CC` is the channel number, between `11` and `26`
+* `PPPP` is the PAN ID, between `0000` and `FFFF`

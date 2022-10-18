@@ -1,7 +1,7 @@
 import {DelimiterParser, SerialPort} from "serialport";
 import {EventEmitter, once} from 'node:events';
 import {setTimeout} from "timers/promises";
-import type {WaremaWMSFrameName, WaremaWMSFrameVersion} from "./WaremaWMSFrame";
+import type {WaremaWMSFrameAck, WaremaWMSFrameName, WaremaWMSFrameVersion} from "./WaremaWMSFrame";
 
 interface WaremaWMSFrameHandlerOptions {
     serialPort: SerialPort
@@ -11,6 +11,10 @@ interface WaremaWMSFrameHandlerSendOptions {
     frameType: string,
     expectedResponse?: string
     expectAck?: boolean,
+    payload?: {
+        channel?: number,
+        panId?: string,
+    },
     timeout?: number,
 }
 
@@ -20,6 +24,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_TYPE_ACK = 'a';
     static readonly FRAME_TYPE_NAME_REQUEST = 'G';
     static readonly FRAME_TYPE_NAME_RESPONSE = 'g';
+    static readonly FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST = 'M';
     static readonly FRAME_TYPE_VERSION_REQUEST = 'V';
     static readonly FRAME_TYPE_VERSION_RESPONSE = 'v';
 
@@ -53,6 +58,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
         const emitType = frameType;
         let emitPayload = {};
         switch (frameType) {
+            case WaremaWMSFrameHandler.FRAME_TYPE_ACK:
+                emitPayload = <WaremaWMSFrameAck>{}
+                break;
             case WaremaWMSFrameHandler.FRAME_TYPE_NAME_RESPONSE:
                 emitPayload = <WaremaWMSFrameName>{
                     name: framePayload
@@ -73,6 +81,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
     async send({
                    frameType,
                    expectedResponse,
+                   payload = {},
                    expectAck = true,
                    timeout = 1000
                }: WaremaWMSFrameHandlerSendOptions) {
@@ -81,6 +90,11 @@ class WaremaWMSFrameHandler extends EventEmitter {
         switch (frameType) {
             case WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST}`;
+                break;
+            case WaremaWMSFrameHandler.FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST:
+                const channel = payload!.channel!.toString().padStart(2, '0');
+                const panId = payload!.panId!.padStart(4, '0');
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST}%${channel}${panId}`;
                 break;
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
