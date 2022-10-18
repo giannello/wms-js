@@ -13,6 +13,7 @@ interface WaremaWMSFrameHandlerSendOptions {
     expectAck?: boolean,
     payload?: {
         channel?: number,
+        encryptionKey?: string,
         panId?: string,
     },
     timeout?: number,
@@ -22,6 +23,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_DELIMITER = '}'
 
     static readonly FRAME_TYPE_ACK = 'a';
+    static readonly FRAME_TYPE_ENCRYPTION_CONFIGURATION_REQUEST = 'K';
     static readonly FRAME_TYPE_NAME_REQUEST = 'G';
     static readonly FRAME_TYPE_NAME_RESPONSE = 'g';
     static readonly FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST = 'M';
@@ -91,9 +93,13 @@ class WaremaWMSFrameHandler extends EventEmitter {
             case WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_NAME_REQUEST}`;
                 break;
+            case WaremaWMSFrameHandler.FRAME_TYPE_ENCRYPTION_CONFIGURATION_REQUEST:
+                const encryptionKey = payload!.encryptionKey!.toUpperCase();
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_ENCRYPTION_CONFIGURATION_REQUEST}401${encryptionKey}`;
+                break;
             case WaremaWMSFrameHandler.FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST:
                 const channel = payload!.channel!.toString().padStart(2, '0');
-                const panId = payload!.panId!.padStart(4, '0');
+                const panId = payload!.panId!.padStart(4, '0').toUpperCase();
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST}%${channel}${panId}`;
                 break;
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:

@@ -18,6 +18,7 @@ const wms = new WaremaWMS(port);
 console.log(wms.getName());
 console.log(wms.getVersion());
 console.log(await wms.configureNetwork(11, 'ABCD'));
+console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
 ```
 
 ## Protocol details
@@ -86,3 +87,12 @@ The following frame types are known:
 * `X` can be either `%` or `#`, depending on whether we want to receive network broadcast messages, or not.
 * `CC` is the channel number, between `11` and `26`
 * `PPPP` is the PAN ID, between `0000` and `FFFF`
+
+#### Stick network encryption key configuration
+
+```
+-> {K 401 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX}
+<- {a}
+```
+
+* `XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` 32-character, hex encryption key
