@@ -37,7 +37,7 @@ class WaremaWMS {
         if (channel < 11 || channel > 26) {
             throw new Error('Channel should be between 11 and 26')
         }
-        if (!/^([0-9A-F]{1,4})$/.test(panId)) {
+        if (!/^([0-9A-F]{1,4})$/i.test(panId)) {
             throw new Error('panId should be a valid HEX betwen 0000 and FFFF')
         }
         return this.frameHandler.send({
@@ -45,6 +45,20 @@ class WaremaWMS {
             payload: {
                 channel,
                 panId
+            }
+        })
+            .then(() => true)
+            .catch(() => false);
+    }
+
+    async configureEncryptionKey(encryptionKey: string): Promise<boolean> {
+        if (!/^([0-9A-F]{32})$/i.test(encryptionKey)) {
+            throw new Error('encryptionKey should be a valid 32-character HEX string')
+        }
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.FRAME_TYPE_ENCRYPTION_CONFIGURATION_REQUEST,
+            payload: {
+                encryptionKey
             }
         })
             .then(() => true)
