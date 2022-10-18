@@ -1,0 +1,22 @@
+{
+  "name": "warema-wms",
+  "version": "0.0.1",
+  "description": "Interface to a Warema WMS network using a Warema WMS stick",
+  "keywords": [
+    "warema",
+    "wms"
+  ],
+  "homepage": "https://github.com/giannello/warema-wms",
+  "bugs": {
+    "url": "https://github.com/giannello/warema-wms/issues"
+  },
+  "license": "GPL-3.0-or-later",
+  "author": {
+    "name": "Giuseppe Iannello"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/giannello/warema-wms.git"
+  },
+  "type": "module"
+}
