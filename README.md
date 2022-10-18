@@ -15,6 +15,7 @@ const port = new SerialPort({
 })
 
 const wms = new WaremaWMS(port);
+console.log(wms.getName());
 ```
 
 ## Protocol details
@@ -54,3 +55,10 @@ The following frame types are known:
 |    `M`     | Stick network parameters configuration     |
 |    `K`     | Stick network encryption key configuration |
 |    `a`     | Stick ACK                                  |
+
+##### Stick name request/response
+
+```
+-> {G}
+<- {gWMS USB-Stick}
+```
