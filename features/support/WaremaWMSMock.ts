@@ -41,6 +41,9 @@ class WaremaWMSMock {
             case 'G':
                 response = 'gMock WMS USB-Stick';
                 break;
+            case 'V':
+                response = 'v12345678   ';
+                break;
             default:
                 throw new Error(`Unhandled frame type: ${frameType}`);
         }

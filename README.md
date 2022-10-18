@@ -16,6 +16,7 @@ const port = new SerialPort({
 
 const wms = new WaremaWMS(port);
 console.log(wms.getName());
+console.log(wms.getVersion());
 ```
 
 ## Protocol details
@@ -62,3 +63,14 @@ The following frame types are known:
 -> {G}
 <- {gWMS USB-Stick}
 ```
+
+#### Stick version request/response
+
+```
+-> {V}
+<- {v XXXXXXXX ___}
+```
+
+* `XXXXXXXX` is the version reported by the stick. It's not known whether there are multiple versions, or if it's
+  possible to upgrade
+* `___` are blank spaces in the response

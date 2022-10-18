@@ -22,6 +22,16 @@ class WaremaWMS {
             .then((res) => res.name)
             .catch(() => new Error('Failed to get the stick name'));
     }
+
+    async getVersion(): Promise<string> {
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST,
+            expectAck: false,
+            expectedResponse: WaremaWMSFrameHandler.FRAME_TYPE_VERSION_RESPONSE
+        })
+            .then((res) => res.version)
+            .catch(() => new Error('Failed to get the stick version'));
+    }
 }
 
 export default WaremaWMS;
