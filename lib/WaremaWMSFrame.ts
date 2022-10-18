@@ -1,6 +1,9 @@
 export interface WaremaWMSFrame {
 }
 
+export interface WaremaWMSFrameAck extends WaremaWMSFrame {
+}
+
 export interface WaremaWMSFrameName extends WaremaWMSFrame {
     name: string
 }
