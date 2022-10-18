@@ -32,6 +32,24 @@ class WaremaWMS {
             .then((res) => res.version)
             .catch(() => new Error('Failed to get the stick version'));
     }
+
+    async configureNetwork(channel: number, panId: string): Promise<boolean> {
+        if (channel < 11 || channel > 26) {
+            throw new Error('Channel should be between 11 and 26')
+        }
+        if (!/^([0-9A-F]{1,4})$/.test(panId)) {
+            throw new Error('panId should be a valid HEX betwen 0000 and FFFF')
+        }
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST,
+            payload: {
+                channel,
+                panId
+            }
+        })
+            .then(() => true)
+            .catch(() => false);
+    }
 }
 
 export default WaremaWMS;
