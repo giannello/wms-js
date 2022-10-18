@@ -32,7 +32,19 @@ class WaremaWMSMock {
 
     mockResponse(): void {
         const receivedFrame = this.mockedPort.port?.lastWrite?.toString();
-        console.log(receivedFrame);
+        if (!receivedFrame) {
+            return
+        }
+        const frameType = receivedFrame.slice(1, 2);
+        let response;
+        switch (frameType) {
+            case 'G':
+                response = 'gMock WMS USB-Stick';
+                break;
+            default:
+                throw new Error(`Unhandled frame type: ${frameType}`);
+        }
+        this.mockedPort.port?.emitData(`{${response}}`);
     }
 }
 
