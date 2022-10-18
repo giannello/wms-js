@@ -1,5 +1,6 @@
 import type {SerialPort} from "serialport";
 import WaremaWMSFrameHandler from "./WaremaWMSFrameHandler.js";
+import WaremaWMSUtils from "./WaremaWMSUtils.js";
 
 class WaremaWMS {
     readonly frameHandler;
@@ -63,6 +64,20 @@ class WaremaWMS {
         })
             .then(() => true)
             .catch(() => false);
+    }
+
+    async wave(serial: string): Promise<boolean> {
+        WaremaWMSUtils.validateSerial(serial);
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST,
+            expectedResponse: WaremaWMSFrameHandler.MESSAGE_TYPE_ACK,
+            payload: {
+                serial
+            }
+        })
+            .then(() => true)
+            .catch(() => false);
+    }
     }
 }
 

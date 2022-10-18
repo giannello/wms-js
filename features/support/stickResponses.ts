@@ -12,3 +12,7 @@ Then('the stick throws an error', function () {
 Then('the stick responds without errors', function () {
     assert.strictEqual(this['response'], true)
 });
+
+Then('the stick responds negatively', function () {
+    assert.strictEqual(this['response'], false)
+});
