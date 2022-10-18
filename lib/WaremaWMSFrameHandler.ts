@@ -5,6 +5,7 @@ import type {
     WaremaWMSFrameAck,
     WaremaWMSFrameName,
     WaremaWMSFrameVersion,
+    WaremaWMSMessageAck,
     WaremaWMSMessageBroadcastWeather,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
@@ -21,6 +22,7 @@ interface WaremaWMSFrameHandlerSendOptions {
         channel?: number,
         encryptionKey?: string,
         panId?: string,
+        serial?: string,
     },
     timeout?: number,
 }
@@ -33,11 +35,14 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_TYPE_NAME_REQUEST = 'G';
     static readonly FRAME_TYPE_NAME_RESPONSE = 'g';
     static readonly FRAME_TYPE_NETWORK_CONFIGURATION_REQUEST = 'M';
+    static readonly FRAME_TYPE_MESSAGE_REQUEST = 'R';
     static readonly FRAME_TYPE_MESSAGE_RESPONSE = 'r';
     static readonly FRAME_TYPE_VERSION_REQUEST = 'V';
     static readonly FRAME_TYPE_VERSION_RESPONSE = 'v';
 
+    static readonly MESSAGE_TYPE_ACK = '50AC'
     static readonly MESSAGE_TYPE_BROADCAST_WEATHER = '7080'
+    static readonly MESSAGE_TYPE_WAVE_REQUEST = '7050'
 
     readonly serialPort;
 
@@ -88,6 +93,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 const messagePayload = framePayload.slice(10);
                 emitType = messageType;
                 switch (messageType) {
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_ACK:
+                        emitPayload = <WaremaWMSMessageAck>{}
+                        break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER:
                         // TODO: implement missing message fields
                         emitPayload = <WaremaWMSMessageBroadcastWeather>{
@@ -132,6 +140,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
                 break;
+            case WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST:
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST}`;
+                break;
             /* c8 ignore next 2 */
             default:
                 throw new Error(`Cannot create frame. Unknown frame type: ${frameType}`);
@@ -146,7 +157,6 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 once(this, WaremaWMSFrameHandler.FRAME_TYPE_ACK).then(() => {
                     controller.abort();
                 }),
-                /* c8 ignore next 3 */
                 setTimeout(timeout, false, {signal: controller.signal}).then(() => {
                     return Promise.reject(new Error('Timeout waiting for ACK'))
                 }),

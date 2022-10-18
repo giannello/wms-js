@@ -36,6 +36,7 @@ class WaremaWMSMock {
             return
         }
         const frameType = receivedFrame.slice(1, 2);
+        const framePayload = receivedFrame.slice(2, -1);
         let response;
         switch (frameType) {
             case 'G':
@@ -47,6 +48,28 @@ class WaremaWMSMock {
                 break;
             case 'V':
                 response = 'v12345678   ';
+                break;
+            case 'R':
+                const requestType = framePayload.substring(0, 2);
+                const serial = framePayload.substring(2, 8);
+                const messageType = framePayload.substring(8, 12);
+
+                // Simulate stick and network timeout
+                if (serial === 'DEAD01') {
+                    return;
+                }
+                this.mockedPort.port?.emitData(`{a}`);
+                if (serial === 'DEAD02') {
+                    return;
+                }
+                const requestCombination = [requestType, messageType, serial].join('-');
+                switch (requestCombination) {
+                    case '06-7050-ABCDEF':
+                        response = 'rABCDEF50ACABCD'
+                        break;
+                    default:
+                        throw new Error(`Unhandled message combination: ${requestCombination}`);
+                }
                 break;
             default:
                 throw new Error(`Unhandled frame type: ${frameType}`);

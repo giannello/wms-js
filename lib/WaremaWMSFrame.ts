@@ -16,6 +16,9 @@ export interface WaremaWMSMessage {
     serial: string
 }
 
+export interface WaremaWMSMessageAck extends WaremaWMSMessage {
+}
+
 export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
     windSpeed: number
 }
