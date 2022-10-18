@@ -21,6 +21,7 @@ console.log(wms.getVersion());
 console.log(await wms.configureNetwork(11, 'ABCD'));
 console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
+console.log(await wms.wave('ABCDEF'));
 ```
 
 ## Protocol details
@@ -120,6 +121,8 @@ The following message types are known:
 
 | Message type | Content                   |
 |:------------:|---------------------------|
+|    `50AC`    | ACK from device           |
+|    `7050`    | Wave request              |
 |    `7080`    | Weather station broadcast |
 
 #### Weather station broadcast
@@ -150,3 +153,19 @@ According to the forum, the following post-processing is needed:
     * otherwise, convert both `L1` and `L2` to dec, multiply them and then multiply by 2
 
 Given the mismatch between the documentation and the sample messages, only wind speed is currently implemented
+
+#### Wave request
+
+```
+-> {R06 XXXXXX 7050}
+<- {a}
+<- {r XXXXXX 50AC YYYY}
+// real world examples
+    r ABCDEF 50AC 88ED
+    r ABCDEF 50AC CDD6
+    r ABCDEF 50AC B043
+
+```
+
+* `XXXXXX` serial number of the target device
+* `YYYY` unknown - changes with every request
