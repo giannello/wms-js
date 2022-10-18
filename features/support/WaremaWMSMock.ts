@@ -41,6 +41,7 @@ class WaremaWMSMock {
             case 'G':
                 response = 'gMock WMS USB-Stick';
                 break;
+            case 'K':
             case 'M':
                 response = 'a';
                 break;

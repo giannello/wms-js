@@ -20,3 +20,15 @@ Feature: Network configuration
     Scenario: Invalid PAN ID
       When I configure the channel 20 and the PAN ID "BEGA"
       Then the stick throws an error
+
+    Scenario: Valid encryption key
+      When I configure the encryption key "012345678ABCDEF012345678ABCDEF01"
+      Then the stick responds without errors
+
+    Scenario: Too short encryption key
+      When I configure the encryption key "01234"
+      Then the stick throws an error
+
+    Scenario: Invalid encryption key
+      When I configure the encryption key "012345678ABCDEFG12345678ABCDEF"
+      Then the stick throws an error
