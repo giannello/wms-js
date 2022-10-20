@@ -65,6 +65,7 @@ class WaremaWMSMock {
                 const requestCombination = [requestType, messageType, serial].join('-');
                 switch (requestCombination) {
                     case '06-7050-ABCDEF':
+                    case '01-7021-ABCDEF':
                         response = 'rABCDEF50ACABCD'
                         break;
                     case '06-7070-ABCDEF':
@@ -91,6 +92,10 @@ class WaremaWMSMock {
 
     mockNetworkParametersChangeBroadcast(serial: string, channel: string, panId: string): void {
         this.mockedPort.port?.emitData(`{r${serial}5060${panId}02${channel}00}`);
+    }
+
+    mockReceivedScanRequest(serial: string, panId: string): void {
+        this.mockedPort.port?.emitData(`{r${serial}7020${panId}02}`);
     }
 
     mockWeatherBroadcast(serial: string, windSpeed: string): void {
