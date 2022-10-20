@@ -67,6 +67,12 @@ class WaremaWMSMock {
                     case '06-7050-ABCDEF':
                         response = 'rABCDEF50ACABCD'
                         break;
+                    case '06-8010-ABCDEF':
+                        response = 'rABCDEF801101000003007FFFFF00'
+                        break;
+                    case '06-8010-FEDCBA':
+                        response = 'rFEDCBA801101000003C87FFFFF01'
+                        break;
                     default:
                         throw new Error(`Unhandled message combination: ${requestCombination}`);
                 }
