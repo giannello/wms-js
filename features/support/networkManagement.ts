@@ -30,3 +30,15 @@ When('I ask the stick to respond to a scan for panId {string} from device {strin
         this['response'] = e;
     }
 });
+
+When('the device {string} sends a network join request for channel {string} and panId {string} with encryption key {string}', async function (serial,  channel, panId, encryptionKey) {
+    this['wmsMock'].mockNetworkJoin(serial, channel, panId, encryptionKey);
+});
+
+Then('the stick receives a network join request for channel {float} and panId {string} with encryption key {string} from device {string}', async function (channel, panId, encryptionKey, serial) {
+    [this['response']] = await once(this['wms'].frameHandler, '5018');
+    assert.strictEqual(this['response'].serial, serial);
+    assert.strictEqual(this['response'].channel, channel);
+    assert.strictEqual(this['response'].panId, panId);
+    assert.strictEqual(this['response'].encryptionKey, encryptionKey);
+});

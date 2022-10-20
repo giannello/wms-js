@@ -11,6 +11,7 @@ import type {
     WaremaWMSMessageBroadcastWeather,
     WaremaWMSMessageDeviceMoveToPosition,
     WaremaWMSMessageDeviceStatus,
+    WaremaWMSMessageNetworkJoin,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
 
@@ -53,6 +54,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE = '7071'
     static readonly MESSAGE_TYPE_DEVICE_STATUS_REQUEST = '8010'
     static readonly MESSAGE_TYPE_DEVICE_STATUS_RESPONSE = '8011'
+    static readonly MESSAGE_TYPE_NETWORK_JOIN = '5018'
     static readonly MESSAGE_TYPE_SCAN_REQUEST = '7020'
     static readonly MESSAGE_TYPE_SCAN_RESPONSE = '7021'
     static readonly MESSAGE_TYPE_WAVE_REQUEST = '7050'
@@ -127,6 +129,14 @@ class WaremaWMSFrameHandler extends EventEmitter {
                         emitPayload = <WaremaWMSMessageBroadcastScan>{
                             serial,
                             panId: messagePayload.slice(0, 4),
+                        }
+                        break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_NETWORK_JOIN:
+                        emitPayload = <WaremaWMSMessageNetworkJoin>{
+                            serial,
+                            panId: messagePayload.slice(0, 4),
+                            encryptionKey: WaremaWMSUtils.reverseHex(messagePayload.slice(4, 36)),
+                            channel: WaremaWMSUtils.hexToDec(messagePayload.slice(38, 40)),
                         }
                         break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE:

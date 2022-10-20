@@ -90,6 +90,10 @@ class WaremaWMSMock {
         this.mockedPort.port?.emitData(`{${response}}`);
     }
 
+    mockNetworkJoin(serial: string, channel: string, panId: string, encryptionKey: string): void {
+        this.mockedPort.port?.emitData(`{r${serial}5018${panId}${encryptionKey}FF${channel}}`);
+    }
+
     mockNetworkParametersChangeBroadcast(serial: string, channel: string, panId: string): void {
         this.mockedPort.port?.emitData(`{r${serial}5060${panId}02${channel}00}`);
     }
