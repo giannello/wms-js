@@ -78,6 +78,18 @@ class WaremaWMS {
             .then(() => true)
             .catch(() => false);
     }
+
+    async getDeviceStatus(serial: string): Promise<Object> {
+        WaremaWMSUtils.validateSerial(serial);
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST,
+            expectedResponse: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_RESPONSE,
+            payload: {
+                serial
+            }
+        })
+            .then((message) => message)
+            .catch(() => false);
     }
 }
 

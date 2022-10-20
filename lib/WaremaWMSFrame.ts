@@ -22,3 +22,10 @@ export interface WaremaWMSMessageAck extends WaremaWMSMessage {
 export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
     windSpeed: number
 }
+
+export interface WaremaWMSMessageDeviceStatus extends WaremaWMSMessage {
+    type: string
+    position: number
+    inclination: number
+    isMoving: boolean
+}

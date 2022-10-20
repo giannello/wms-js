@@ -22,6 +22,7 @@ console.log(await wms.configureNetwork(11, 'ABCD'));
 console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
 console.log(await wms.wave('ABCDEF'));
+console.log(await wms.getDeviceStatus('ABCDEF'));
 ```
 
 ## Protocol details
@@ -119,11 +120,12 @@ Messages are embedded within `R`/`r` frames, and can be of different types.
 
 The following message types are known:
 
-| Message type | Content                   |
-|:------------:|---------------------------|
-|    `50AC`    | ACK from device           |
-|    `7050`    | Wave request              |
-|    `7080`    | Weather station broadcast |
+| Message type  | Content                        |
+|:-------------:|--------------------------------|
+|    `50AC`     | ACK from device                |
+|    `7050`     | Wave request                   |
+|    `7080`     | Weather station broadcast      |
+| `8010`/`8011` | Device status request/response |
 
 #### Weather station broadcast
 
@@ -169,3 +171,28 @@ Given the mismatch between the documentation and the sample messages, only wind 
 
 * `XXXXXX` serial number of the target device
 * `YYYY` unknown - changes with every request
+
+#### Device status request/response
+
+```
+-> {R06 XXXXXX 8010 01000005}
+<- {a}
+<- {r XXXXXX 8011 010000 TT PP WW V1 V2 MM}
+// real world examples
+    r ABCDEF 8011 010000 05 00 FF FF FF 00
+    r ABCDEF 8011 010000 05 14 FF FF FF 01
+    r ABCDEF 8011 010000 05 1D FF FF FF 01
+    r ABCDEF 8011 010000 05 36 FF FF FF 00
+
+```
+
+* `XXXXXX` serial number of the target device
+* `TT` device type. `03` and `05` seen in the wild. `05` seems to be the `WMS Plug receiver`
+* `PP` position * 2 (hex). Convert to dec and divide by 2 to have a 0-100 value. 0 means fully retracted
+* `WW` inclination + 127 (hex). Convert to dec and subtract 127
+* `V1` valance 1
+* `V2` valance 2
+* `MM` status of the device: `00` for a stopped device, `01` for a device that is moving
+
+Given the lack of test devices, `valance` is currently not implemented
+The `01000005` string in the request and `010000` in the response has no known meaning.
