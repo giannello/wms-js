@@ -12,6 +12,7 @@ import type {
     WaremaWMSMessageDeviceMoveToPosition,
     WaremaWMSMessageDeviceStatus,
     WaremaWMSMessageNetworkJoin,
+    WaremaWMSMessageWaveRequest,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
 
@@ -129,6 +130,11 @@ class WaremaWMSFrameHandler extends EventEmitter {
                         emitPayload = <WaremaWMSMessageBroadcastScan>{
                             serial,
                             panId: messagePayload.slice(0, 4),
+                        }
+                        break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST:
+                        emitPayload = <WaremaWMSMessageWaveRequest>{
+                            serial,
                         }
                         break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_NETWORK_JOIN:
