@@ -6,6 +6,7 @@ import type {
     WaremaWMSFrameName,
     WaremaWMSFrameVersion,
     WaremaWMSMessageAck,
+    WaremaWMSMessageBroadcastNetworkParametersChange,
     WaremaWMSMessageBroadcastWeather,
     WaremaWMSMessageDeviceMoveToPosition,
     WaremaWMSMessageDeviceStatus,
@@ -45,6 +46,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
     static readonly FRAME_TYPE_VERSION_RESPONSE = 'v';
 
     static readonly MESSAGE_TYPE_ACK = '50AC'
+    static readonly MESSAGE_TYPE_BROADCAST_NETWORK_PARAMETERS_CHANGE = '5060'
     static readonly MESSAGE_TYPE_BROADCAST_WEATHER = '7080'
     static readonly MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST = '7070'
     static readonly MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE = '7071'
@@ -103,6 +105,13 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 switch (messageType) {
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_ACK:
                         emitPayload = <WaremaWMSMessageAck>{}
+                        break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_NETWORK_PARAMETERS_CHANGE:
+                        emitPayload = <WaremaWMSMessageBroadcastNetworkParametersChange>{
+                            serial,
+                            panId: messagePayload.slice(0, 4),
+                            channel: WaremaWMSUtils.hexToDec(messagePayload.slice(6, 8)),
+                        }
                         break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER:
                         // TODO: implement missing message fields

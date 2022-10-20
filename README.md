@@ -21,6 +21,7 @@ console.log(wms.getVersion());
 console.log(await wms.configureNetwork(11, 'ABCD'));
 console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
+wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_NETWORK_PARAMETERS_CHANGE, console.log);
 console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
 console.log(await wms.moveToPosition('ABCDEF', 50, 0));
@@ -123,6 +124,7 @@ The following message types are known:
 
 | Message type  | Content                                  |
 |:-------------:|------------------------------------------|
+|    `5060`     | Change network parameters broadcast      |
 |    `50AC`     | ACK from device                          |
 |    `7050`     | Wave request                             |
 |    `7080`     | Weather station broadcast                |
@@ -218,6 +220,18 @@ The `01000005` string in the request and `010000` in the response has no known m
 * `V2` valance 2
 * `pp` previous _target_ position (hex)
 * `ww` previous _target_ inclination (hex)
+
+#### Change network parameters broadcast
+
+This message is sent during device discovery, when linking a remote to a device.
+
+```
+<- {r XXXXXX 5060 PPPP 02 CC 00}
+```
+
+* `XXXXXX` serial number of the source device
+* `PPPP` PAN ID
+* `CC` channel
 
 ### Notes about hex-encoded fields
 
