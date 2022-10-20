@@ -12,3 +12,21 @@ Then('the stick receives a request to change the network parameters to channel {
     assert.strictEqual(this['response'].channel, channel);
     assert.strictEqual(this['response'].panId, panId);
 });
+
+When('the device {string} sends a scan request for panId {string}', async function (serial,  panId) {
+    this['wmsMock'].mockReceivedScanRequest(serial, panId);
+});
+
+Then('the stick receives a scan request for panId {string} from device {string}', async function (panId, serial) {
+    [this['response']] = await once(this['wms'].frameHandler, '7020');
+    assert.strictEqual(this['response'].serial, serial);
+    assert.strictEqual(this['response'].panId, panId);
+});
+
+When('I ask the stick to respond to a scan for panId {string} from device {string}', async function (panId, serial) {
+    try {
+        this['response'] = await this['wms'].respondToScanRequest(serial, panId);
+    } catch (e) {
+        this['response'] = e;
+    }
+});

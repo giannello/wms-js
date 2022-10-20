@@ -24,6 +24,10 @@ export interface WaremaWMSMessageBroadcastNetworkParametersChange extends Warema
     panId: string
 }
 
+export interface WaremaWMSMessageBroadcastScan extends WaremaWMSMessage {
+    panId: string
+}
+
 export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
     windSpeed: number
 }
