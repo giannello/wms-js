@@ -106,6 +106,20 @@ class WaremaWMS {
             .then((message) => message)
             .catch(() => false);
     }
+
+    async respondToScanRequest(serial: string, panId: string): Promise<Object> {
+        WaremaWMSUtils.validateSerial(serial);
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE,
+            expectedResponse: WaremaWMSFrameHandler.MESSAGE_TYPE_ACK,
+            payload: {
+                serial,
+                panId,
+            }
+        })
+            .then(() => true)
+            .catch(() => false);
+    }
 }
 
 export default WaremaWMS;

@@ -22,6 +22,7 @@ console.log(await wms.configureNetwork(11, 'ABCD'));
 console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01'));
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_NETWORK_PARAMETERS_CHANGE, console.log);
+wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_REQUEST, console.log);
 console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
 console.log(await wms.moveToPosition('ABCDEF', 50, 0));
@@ -126,6 +127,7 @@ The following message types are known:
 |:-------------:|------------------------------------------|
 |    `5060`     | Change network parameters broadcast      |
 |    `50AC`     | ACK from device                          |
+| `7020`/`7021` | Scan request/response                    |
 |    `7050`     | Wave request                             |
 |    `7080`     | Weather station broadcast                |
 | `7070`/`7071` | Device move to position request/response |
@@ -231,12 +233,34 @@ This message is sent during device discovery, when linking a remote to a device.
 
 * `XXXXXX` serial number of the source device
 * `PPPP` PAN ID
-* `CC` channel
+* `CC` channel (hex)
+
+#### Scan request/response
+
+```
+<- {r XXXXXX 7020 PPPP 02}
+-> {R01 XXXXXX 7021 PPPP 02}
+```
+
+* `XXXXXX` serial number of the source device
+* `PPPP` PAN ID
+
+#### Network join request
+
+```
+<- {r XXXXXX 5018 PPPP KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK FF CC}
+```
+
+* `XXXXXX` serial number of the source device
+* `PPPP` PAN ID
+* `KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK` network encryption key (reversed)
+* `CC` channel (hex)
 
 ### Notes about hex-encoded fields
 
 Some of the fields in the messages need to be converted to be properly usable.
 
+* **Channel**: Convert to base 10
 * **Inclination**: Convert to base 10 and subtract 127
 * **Position**: Convert to base 10 and divide by 2 to have a 0-100 value. 0 means fully retracted
 * **Wind speed**: Convert to base 10
