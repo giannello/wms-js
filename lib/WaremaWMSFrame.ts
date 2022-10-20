@@ -44,3 +44,7 @@ export interface WaremaWMSMessageDeviceMoveToPosition extends WaremaWMSMessage {
     previousTargetPosition: number
     previousTargetInclination: number
 }
+
+export interface WaremaWMSMessageNetworkJoin extends WaremaWMSMessageBroadcastNetworkParametersChange {
+    encryptionKey: string
+}
