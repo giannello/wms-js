@@ -23,3 +23,17 @@ Then('the stick responds with position {float}, inclination {float}, isMoving {b
     assert.strictEqual(this['response'].inclination, inclination);
     assert.strictEqual(this['response'].isMoving, isMoving);
 });
+
+When('I ask the stick to move the device {string} to position {float} and inclination {float}', async function (serial, position, angle) {
+    try {
+        this['response'] = await this['wms'].moveToPosition(serial, position, angle);
+    } catch (e) {
+        this['response'] = e;
+    }
+});
+
+Then('the stick responds with previous target position {float}, previous target inclination {float} from device {string}', async function (previousTargetPosition, previousTargetInclination, serial) {
+    assert.strictEqual(this['response'].serial, serial);
+    assert.strictEqual(this['response'].previousTargetPosition, previousTargetPosition);
+    assert.strictEqual(this['response'].previousTargetInclination, previousTargetInclination);
+});

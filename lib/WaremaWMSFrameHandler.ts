@@ -7,6 +7,7 @@ import type {
     WaremaWMSFrameVersion,
     WaremaWMSMessageAck,
     WaremaWMSMessageBroadcastWeather,
+    WaremaWMSMessageDeviceMoveToPosition,
     WaremaWMSMessageDeviceStatus,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
@@ -22,7 +23,9 @@ interface WaremaWMSFrameHandlerSendOptions {
     payload?: {
         channel?: number,
         encryptionKey?: string,
+        inclination?: number,
         panId?: string,
+        position?: number,
         serial?: string,
     },
     timeout?: number,
@@ -43,6 +46,8 @@ class WaremaWMSFrameHandler extends EventEmitter {
 
     static readonly MESSAGE_TYPE_ACK = '50AC'
     static readonly MESSAGE_TYPE_BROADCAST_WEATHER = '7080'
+    static readonly MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST = '7070'
+    static readonly MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE = '7071'
     static readonly MESSAGE_TYPE_DEVICE_STATUS_REQUEST = '8010'
     static readonly MESSAGE_TYPE_DEVICE_STATUS_RESPONSE = '8011'
     static readonly MESSAGE_TYPE_WAVE_REQUEST = '7050'
@@ -106,6 +111,14 @@ class WaremaWMSFrameHandler extends EventEmitter {
                             windSpeed: WaremaWMSUtils.hexToDec(messagePayload.slice(2, 4)),
                         }
                         break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE:
+                        // TODO: implement missing message fields
+                        emitPayload = <WaremaWMSMessageDeviceMoveToPosition>{
+                            serial,
+                            previousTargetPosition: WaremaWMSUtils.positionHexToDec(messagePayload.slice(10, 12)),
+                            previousTargetInclination: WaremaWMSUtils.inclinationHexToDec(messagePayload.slice(12, 14)),
+                        }
+                        break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_RESPONSE:
                         // TODO: implement missing message fields
                         emitPayload = <WaremaWMSMessageDeviceStatus>{
@@ -152,6 +165,11 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 break;
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
+                break;
+            case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST:
+                const position = WaremaWMSUtils.positionDecToHex(payload!.position!);
+                const inclination = WaremaWMSUtils.inclinationDecToHex(payload!.inclination!);
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST}03${position}${inclination}FFFF`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST}01000005`;
