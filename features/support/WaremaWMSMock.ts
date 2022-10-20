@@ -102,6 +102,10 @@ class WaremaWMSMock {
         this.mockedPort.port?.emitData(`{r${serial}7020${panId}02}`);
     }
 
+    mockReceivedWaveRequest(serial: string): void {
+        this.mockedPort.port?.emitData(`{r${serial}7050}`);
+    }
+
     mockWeatherBroadcast(serial: string, windSpeed: string): void {
         this.mockedPort.port?.emitData(`{r${serial}7080FF${windSpeed}FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}`);
     }

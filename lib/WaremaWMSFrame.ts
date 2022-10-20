@@ -48,3 +48,6 @@ export interface WaremaWMSMessageDeviceMoveToPosition extends WaremaWMSMessage {
 export interface WaremaWMSMessageNetworkJoin extends WaremaWMSMessageBroadcastNetworkParametersChange {
     encryptionKey: string
 }
+
+export interface WaremaWMSMessageWaveRequest extends WaremaWMSMessage {
+}

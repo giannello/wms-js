@@ -129,7 +129,7 @@ The following message types are known:
 |    `5060`     | Change network parameters broadcast      |
 |    `50AC`     | ACK from device                          |
 | `7020`/`7021` | Scan request/response                    |
-|    `7050`     | Wave request                             |
+| `7050`/`7051` | Wave request/response                    |
 |    `7080`     | Weather station broadcast                |
 | `7070`/`7071` | Device move to position request/response |
 | `8010`/`8011` | Device status request/response           |
@@ -163,7 +163,7 @@ According to the forum, the following post-processing is needed:
 
 Given the mismatch between the documentation and the sample messages, only wind speed is currently implemented
 
-#### Wave request
+#### Wave request/response
 
 ```
 -> {R06 XXXXXX 7050}
@@ -173,10 +173,11 @@ Given the mismatch between the documentation and the sample messages, only wind 
     r ABCDEF 50AC 88ED
     r ABCDEF 50AC CDD6
     r ABCDEF 50AC B043
-
+---
+<- {r XXXXXX 7050}
 ```
 
-* `XXXXXX` serial number of the target device
+* `XXXXXX` serial number of the source device
 * `YYYY` unknown - changes with every request
 
 #### Device status request/response

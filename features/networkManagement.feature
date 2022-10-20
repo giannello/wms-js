@@ -14,6 +14,14 @@ Feature: Network management
       When the device "FEDCBA" sends a network parameters change request for channel "0D" and panId "FFFF"
       Then the stick receives a request to change the network parameters to channel 13 and panId "FFFF" from device "FEDCBA"
 
+    Scenario: Received wave request
+      When the device "ABCDEF" sends a wave request
+      Then the stick receives a wave request from device "ABCDEF"
+
+    Scenario: Received wave request
+      When the device "FEDCBA" sends a wave request
+      Then the stick receives a wave request from device "FEDCBA"
+
     Scenario: Received scan request
       When the device "ABCDEF" sends a scan request for panId "ABCD"
       Then the stick receives a scan request for panId "ABCD" from device "ABCDEF"
