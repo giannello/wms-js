@@ -42,3 +42,12 @@ Then('the stick receives a network join request for channel {float} and panId {s
     assert.strictEqual(this['response'].panId, panId);
     assert.strictEqual(this['response'].encryptionKey, encryptionKey);
 });
+
+When('the device {string} sends a wave request', async function (serial) {
+    this['wmsMock'].mockReceivedWaveRequest(serial);
+});
+
+Then('the stick receives a wave request from device {string}', async function (serial) {
+    [this['response']] = await once(this['wms'].frameHandler, '7050');
+    assert.strictEqual(this['response'].serial, serial);
+});
