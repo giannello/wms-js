@@ -7,6 +7,7 @@ import type {
     WaremaWMSFrameVersion,
     WaremaWMSMessageAck,
     WaremaWMSMessageBroadcastWeather,
+    WaremaWMSMessageDeviceStatus,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
 
@@ -42,6 +43,8 @@ class WaremaWMSFrameHandler extends EventEmitter {
 
     static readonly MESSAGE_TYPE_ACK = '50AC'
     static readonly MESSAGE_TYPE_BROADCAST_WEATHER = '7080'
+    static readonly MESSAGE_TYPE_DEVICE_STATUS_REQUEST = '8010'
+    static readonly MESSAGE_TYPE_DEVICE_STATUS_RESPONSE = '8011'
     static readonly MESSAGE_TYPE_WAVE_REQUEST = '7050'
 
     readonly serialPort;
@@ -103,6 +106,16 @@ class WaremaWMSFrameHandler extends EventEmitter {
                             windSpeed: WaremaWMSUtils.hexToDec(messagePayload.slice(2, 4)),
                         }
                         break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_RESPONSE:
+                        // TODO: implement missing message fields
+                        emitPayload = <WaremaWMSMessageDeviceStatus>{
+                            serial,
+                            type: messagePayload.slice(6, 8),
+                            position: WaremaWMSUtils.positionHexToDec(messagePayload.slice(8, 10)),
+                            inclination: WaremaWMSUtils.inclinationHexToDec(messagePayload.slice(10, 12)),
+                            isMoving: WaremaWMSUtils.isMovingHexToBoolean(messagePayload.slice(16, 18)),
+                        }
+                        break
                     /* c8 ignore next 2 */
                     default:
                         throw new Error(`Cannot handle. Unknown message type for frame: ${frame.toString()}`);
@@ -139,6 +152,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 break;
             case WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
+                break;
+            case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST:
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST}01000005`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST}`;
