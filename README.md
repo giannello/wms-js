@@ -23,6 +23,7 @@ console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01')
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_NETWORK_PARAMETERS_CHANGE, console.log);
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_REQUEST, console.log);
+wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_NETWORK_JOIN, console.log);
 console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
 console.log(await wms.moveToPosition('ABCDEF', 50, 0));
@@ -262,5 +263,6 @@ Some of the fields in the messages need to be converted to be properly usable.
 
 * **Channel**: Convert to base 10
 * **Inclination**: Convert to base 10 and subtract 127
+* **Network encryption key**: Reverse (`ABCDEF` should become `EFCDAB`)
 * **Position**: Convert to base 10 and divide by 2 to have a 0-100 value. 0 means fully retracted
 * **Wind speed**: Convert to base 10

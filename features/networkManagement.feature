@@ -32,3 +32,11 @@ Feature: Network management
     Scenario: Scan response - force network timeout
       When I ask the stick to respond to a scan for panId "ABCD" from device "DEAD02"
       Then the stick responds negatively
+
+    Scenario: Network join request
+      When the device "ABCDEF" sends a network join request for channel "0C" and panId "BEEF" with encryption key "12345678123456781234567812345678"
+      Then the stick receives a network join request for channel 12 and panId "BEEF" with encryption key "78563412785634127856341278563412" from device "ABCDEF"
+
+    Scenario: Network join request
+      When the device "FEDCBA" sends a network join request for channel "0E" and panId "FEED" with encryption key "BEEFBEEF12341234DEADDEAD12341234"
+      Then the stick receives a network join request for channel 14 and panId "FEED" with encryption key "34123412ADDEADDE34123412EFBEEFBE" from device "FEDCBA"

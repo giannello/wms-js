@@ -23,6 +23,10 @@ class WaremaWMSUtils {
         return parseInt(positionHex, 16) / 2;
     }
 
+    static reverseHex(string: string): string {
+        return string.match(/../g)!.reverse().join('');
+    }
+
     static validateSerial(serial: string): void {
         if (!/^([0-9A-F]{6})$/.test(serial)) {
             throw new Error('Invalid serial provided');
