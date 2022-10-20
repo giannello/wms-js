@@ -19,6 +19,11 @@ export interface WaremaWMSMessage {
 export interface WaremaWMSMessageAck extends WaremaWMSMessage {
 }
 
+export interface WaremaWMSMessageBroadcastNetworkParametersChange extends WaremaWMSMessage {
+    channel: number
+    panId: string
+}
+
 export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
     windSpeed: number
 }
