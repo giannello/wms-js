@@ -91,6 +91,21 @@ class WaremaWMS {
             .then((message) => message)
             .catch(() => false);
     }
+
+    async moveToPosition(serial: string, position: number, inclination: number): Promise<Object> {
+        WaremaWMSUtils.validateSerial(serial);
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST,
+            expectedResponse: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE,
+            payload: {
+                serial,
+                position,
+                inclination,
+            }
+        })
+            .then((message) => message)
+            .catch(() => false);
+    }
 }
 
 export default WaremaWMS;

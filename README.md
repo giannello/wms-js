@@ -23,6 +23,7 @@ console.log(await wms.configureEncryptionKey('012345678ABCDEF012345678ABCDEF01')
 wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER, console.log);
 console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
+console.log(await wms.moveToPosition('ABCDEF', 50, 0));
 ```
 
 ## Protocol details
@@ -120,12 +121,13 @@ Messages are embedded within `R`/`r` frames, and can be of different types.
 
 The following message types are known:
 
-| Message type  | Content                        |
-|:-------------:|--------------------------------|
-|    `50AC`     | ACK from device                |
-|    `7050`     | Wave request                   |
-|    `7080`     | Weather station broadcast      |
-| `8010`/`8011` | Device status request/response |
+| Message type  | Content                                  |
+|:-------------:|------------------------------------------|
+|    `50AC`     | ACK from device                          |
+|    `7050`     | Wave request                             |
+|    `7080`     | Weather station broadcast                |
+| `7070`/`7071` | Device move to position request/response |
+| `8010`/`8011` | Device status request/response           |
 
 #### Weather station broadcast
 
@@ -188,11 +190,39 @@ Given the mismatch between the documentation and the sample messages, only wind 
 
 * `XXXXXX` serial number of the target device
 * `TT` device type. `03` and `05` seen in the wild. `05` seems to be the `WMS Plug receiver`
-* `PP` position * 2 (hex). Convert to dec and divide by 2 to have a 0-100 value. 0 means fully retracted
-* `WW` inclination + 127 (hex). Convert to dec and subtract 127
+* `PP` position (hex)
+* `WW` inclination (hex)
 * `V1` valance 1
 * `V2` valance 2
 * `MM` status of the device: `00` for a stopped device, `01` for a device that is moving
 
 Given the lack of test devices, `valance` is currently not implemented
 The `01000005` string in the request and `010000` in the response has no known meaning.
+
+#### Move to position request/response
+
+```
+-> {R06 XXXXXX 7070 03 PP WW V1 V2}
+<- {a}
+<- {r XXXXXX 7071 0010023F02 pp ww FFFF0C0DFFFF}
+// real world examples
+    r ABCDEF 7071 0010023F02 96 7F FFFF0CFFFFFF
+    r ABCDEF 7071 0010023F02 C8 7F FFFF0CFFFFFF
+    r ABCDEF 7071 0010023F02 64 7F FFFF0CFFFFFF
+```
+
+* `XXXXXX` serial number of the target device
+* `PP` position (hex)
+* `WW` inclination (hex)
+* `V1` valance 1
+* `V2` valance 2
+* `pp` previous _target_ position (hex)
+* `ww` previous _target_ inclination (hex)
+
+### Notes about hex-encoded fields
+
+Some of the fields in the messages need to be converted to be properly usable.
+
+* **Inclination**: Convert to base 10 and subtract 127
+* **Position**: Convert to base 10 and divide by 2 to have a 0-100 value. 0 means fully retracted
+* **Wind speed**: Convert to base 10
