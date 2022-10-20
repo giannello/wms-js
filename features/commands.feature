@@ -41,3 +41,19 @@ Feature: Commands
     Scenario: Get device status - force network timeout
       When I ask the stick for the status of device "DEAD02"
       Then the stick responds negatively
+
+    Scenario: Move device - valid serial, fully retracted to fully extended
+      When I ask the stick to move the device "ABCDEF" to position 100 and inclination 0
+      Then the stick responds with previous target position 0, previous target inclination 0 from device "ABCDEF"
+
+    Scenario: Move device - valid serial, fully extended to fully extended
+      When I ask the stick to move the device "FEDCBA" to position 0 and inclination 0
+      Then the stick responds with previous target position 100, previous target inclination 0 from device "FEDCBA"
+
+    Scenario: Move device - force stick timeout
+      When I ask the stick to move the device "DEAD01" to position 0 and inclination 0
+      Then the stick responds negatively
+
+    Scenario: Move device - force network timeout
+      When I ask the stick to move the device "DEAD02" to position 0 and inclination 0
+      Then the stick responds negatively

@@ -29,3 +29,9 @@ export interface WaremaWMSMessageDeviceStatus extends WaremaWMSMessage {
     inclination: number
     isMoving: boolean
 }
+
+export interface WaremaWMSMessageDeviceMoveToPosition extends WaremaWMSMessage {
+    type: string
+    previousTargetPosition: number
+    previousTargetInclination: number
+}

@@ -67,6 +67,12 @@ class WaremaWMSMock {
                     case '06-7050-ABCDEF':
                         response = 'rABCDEF50ACABCD'
                         break;
+                    case '06-7070-ABCDEF':
+                        response = 'rABCDEF70710010023F02007FFFFF0C0DFFFF'
+                        break;
+                    case '06-7070-FEDCBA':
+                        response = 'rFEDCBA70710010023F02C87FFFFF0C0DFFFF'
+                        break;
                     case '06-8010-ABCDEF':
                         response = 'rABCDEF801101000003007FFFFF00'
                         break;

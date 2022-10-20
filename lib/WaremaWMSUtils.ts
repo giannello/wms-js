@@ -3,12 +3,20 @@ class WaremaWMSUtils {
         return parseInt(numberHex, 16);
     }
 
+    static inclinationDecToHex(inclinationDec: number): string {
+        return (inclinationDec + 127).toString(16).toUpperCase().padStart(2, '0');
+    }
+
     static inclinationHexToDec(inclinationHex: string): number {
         return parseInt(inclinationHex, 16) - 127;
     }
 
     static isMovingHexToBoolean(isMovingHex: string): boolean {
         return Boolean(parseInt(isMovingHex, 16));
+    }
+
+    static positionDecToHex(positionDec: number): string {
+        return (positionDec * 2).toString(16).toUpperCase().padStart(2, '0');
     }
 
     static positionHexToDec(positionHex: string): number {
