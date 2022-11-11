@@ -37,3 +37,11 @@ Then('the stick responds with previous target position {float}, previous target 
     assert.strictEqual(this['response'].previousTargetPosition, previousTargetPosition);
     assert.strictEqual(this['response'].previousTargetInclination, previousTargetInclination);
 });
+
+When('I ask the stick to stop the device {string}', async function (serial) {
+    try {
+        this['response'] = await this['wms'].stop(serial);
+    } catch (e) {
+        this['response'] = e;
+    }
+});

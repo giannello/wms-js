@@ -27,6 +27,7 @@ wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_NETWORK_JOIN, console.log
 console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
 console.log(await wms.moveToPosition('ABCDEF', 50, 0));
+console.log(await wms.stop('ABCDEF'));
 ```
 
 ## Protocol details
@@ -208,7 +209,8 @@ The `01000005` string in the request and `010000` in the response has no known m
 #### Move to position request/response
 
 ```
--> {R06 XXXXXX 7070 03 PP WW V1 V2}
+-> {R06 XXXXXX 7070 CC} (for CC == 01)
+-> {R06 XXXXXX 7070 CC PP WW V1 V2} (for CC == 03)
 <- {a}
 <- {r XXXXXX 7071 0010023F02 pp ww FFFF0C0DFFFF}
 // real world examples
@@ -218,6 +220,9 @@ The `01000005` string in the request and `010000` in the response has no known m
 ```
 
 * `XXXXXX` serial number of the target device
+* `CC` command
+  * `01` stop moving
+  * `03` move to position
 * `PP` position (hex)
 * `WW` inclination (hex)
 * `V1` valance 1

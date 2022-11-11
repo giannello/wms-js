@@ -201,9 +201,16 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_VERSION_REQUEST}`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST:
-                const position = WaremaWMSUtils.positionDecToHex(payload!.position!);
-                const inclination = WaremaWMSUtils.inclinationDecToHex(payload!.inclination!);
-                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST}03${position}${inclination}FFFF`;
+                // Move if position || inclination is defined, otherwise stop
+                let subcommand;
+                if (payload.position !== undefined || payload.inclination !== undefined) {
+                    const position = WaremaWMSUtils.positionDecToHex(payload!.position!);
+                    const inclination = WaremaWMSUtils.inclinationDecToHex(payload!.inclination!);
+                    subcommand = `03${position}${inclination}FFFF`; // 02, 03, 06, 07, 08, 0A, 0D, 0E work,
+                } else {
+                    subcommand = `01`;
+                }
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST}${subcommand}`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST}01000005`;

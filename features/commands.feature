@@ -56,3 +56,15 @@ Feature: Commands
     Scenario: Move device - force network timeout
       When I ask the stick to move the device "DEAD02" to position 0 and inclination 0
       Then the stick responds negatively
+
+    Scenario: Stop device - valid serial
+      When I ask the stick to stop the device "ABCDEF"
+      Then the stick responds with previous target position 0, previous target inclination 0 from device "ABCDEF"
+
+    Scenario: Stop device - force stick timeout
+      When I ask the stick to stop the device "DEAD01"
+      Then the stick responds negatively
+
+    Scenario: Stop device - force network timeout
+      When I ask the stick to stop the device "DEAD02"
+      Then the stick responds negatively
