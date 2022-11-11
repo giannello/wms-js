@@ -107,6 +107,19 @@ class WaremaWMS {
             .catch(() => false);
     }
 
+    async stop(serial: string): Promise<Object> {
+        WaremaWMSUtils.validateSerial(serial);
+        return this.frameHandler.send({
+            frameType: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_REQUEST,
+            expectedResponse: WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE,
+            payload: {
+                serial,
+            }
+        })
+            .then((message) => message)
+            .catch(() => false);
+    }
+
     async respondToScanRequest(serial: string, panId: string): Promise<Object> {
         WaremaWMSUtils.validateSerial(serial);
         return this.frameHandler.send({
