@@ -28,6 +28,8 @@ console.log(await wms.wave('ABCDEF'));
 console.log(await wms.getDeviceStatus('ABCDEF'));
 console.log(await wms.moveToPosition('ABCDEF', 50, 0));
 console.log(await wms.stop('ABCDEF'));
+wms.frameHandler.on(WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE, console.log);
+console.log(await wms.scan('ABCD'));
 ```
 
 ## Protocol details
@@ -242,7 +244,7 @@ This message is sent during device discovery, when linking a remote to a device.
 * `PPPP` PAN ID
 * `CC` channel (hex)
 
-#### Scan request/response
+#### Received scan request/response
 
 ```
 <- {r XXXXXX 7020 PPPP 02}
@@ -251,6 +253,19 @@ This message is sent during device discovery, when linking a remote to a device.
 
 * `XXXXXX` serial number of the source device
 * `PPPP` PAN ID
+
+#### Send scan request/response
+
+```
+-> {R04 XXXXXX 7020 PPPP TT}
+<- {a}
+<- {r XXXXXX 7021 PPPP TT UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU}
+```
+
+* `XXXXXX` serial number of the source device (should be `FFFFFF` when sending a scan request)
+* `PPPP` PAN ID
+* `TT` device type
+* `UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU` unknown
 
 #### Network join request
 

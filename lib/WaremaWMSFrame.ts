@@ -28,6 +28,11 @@ export interface WaremaWMSMessageBroadcastScan extends WaremaWMSMessage {
     panId: string
 }
 
+export interface WaremaWMSMessageBroadcastScanResponse extends WaremaWMSMessage {
+    panId: string
+    deviceType: number
+}
+
 export interface WaremaWMSMessageBroadcastWeather extends WaremaWMSMessage {
     windSpeed: number
 }
