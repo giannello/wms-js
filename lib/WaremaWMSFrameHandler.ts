@@ -8,6 +8,7 @@ import type {
     WaremaWMSMessageAck,
     WaremaWMSMessageBroadcastNetworkParametersChange,
     WaremaWMSMessageBroadcastScan,
+    WaremaWMSMessageBroadcastScanResponse,
     WaremaWMSMessageBroadcastWeather,
     WaremaWMSMessageDeviceMoveToPosition,
     WaremaWMSMessageDeviceStatus,
@@ -15,6 +16,7 @@ import type {
     WaremaWMSMessageWaveRequest,
 } from "./WaremaWMSFrame";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
+import {DEVICE_TYPE_STICK} from "./WaremaWMSDevice.js";
 
 interface WaremaWMSFrameHandlerOptions {
     serialPort: SerialPort
@@ -132,6 +134,13 @@ class WaremaWMSFrameHandler extends EventEmitter {
                             panId: messagePayload.slice(0, 4),
                         }
                         break
+                    case WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE:
+                        emitPayload = <WaremaWMSMessageBroadcastScanResponse>{
+                            serial,
+                            panId: messagePayload.slice(0, 4),
+                            deviceType: parseInt(messagePayload.slice(4, 6)),
+                        }
+                        break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST:
                         emitPayload = <WaremaWMSMessageWaveRequest>{
                             serial,
@@ -214,6 +223,9 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_STATUS_REQUEST}01000005`;
+                break;
+            case WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_REQUEST:
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}04FFFFFF${WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_REQUEST}${payload!.panId}${DEVICE_TYPE_STICK.toString().padStart(2, '0')}`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}01${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE}FFFF02`;

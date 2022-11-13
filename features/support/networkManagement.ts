@@ -51,3 +51,22 @@ Then('the stick receives a wave request from device {string}', async function (s
     [this['response']] = await once(this['wms'].frameHandler, '7050');
     assert.strictEqual(this['response'].serial, serial);
 });
+
+When('I ask the stick to scan the network for panId {string}', async function (panId) {
+    try {
+        this['response'] = await this['wms'].scan(panId);
+    } catch (e) {
+        this['response'] = e;
+    }
+})
+
+When('the device {string} of type {int} sends a scan response for panId {string}', async function (serial, deviceType, panId) {
+    this['wmsMock'].mockReceivedScanResponse(serial, deviceType, panId);
+})
+
+When('the stick receives a scan response for panId {string} from device {string} of type {int}', async function (panId, serial, deviceType) {
+    [this['response']] = await once(this['wms'].frameHandler, '7021');
+    assert.strictEqual(this['response'].panId, panId);
+    assert.strictEqual(this['response'].serial, serial);
+    assert.strictEqual(this['response'].deviceType, deviceType);
+})
