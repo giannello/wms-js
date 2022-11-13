@@ -20,6 +20,7 @@
   },
   "type": "module",
   "scripts": {
+    "build": "tsc --build",
     "test": "NODE_OPTIONS='--loader ts-node/esm' c8 cucumber-js",
     "test-debug": "NODE_OPTIONS='--loader ts-node/esm --inspect-brk=0.0.0.0' cucumber-js",
     "test-watch": "NODE_OPTIONS='--loader ts-node/esm' nodemon --exec c8 cucumber-js"
