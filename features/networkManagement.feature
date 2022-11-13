@@ -30,15 +30,27 @@ Feature: Network management
       When the device "FEDCBA" sends a scan request for panId "BEEF"
       Then the stick receives a scan request for panId "BEEF" from device "FEDCBA"
 
-    Scenario: Scan response
+    Scenario: Received scan response
+      When the device "ABCDEF" of type 25 sends a scan response for panId "ABCD"
+      Then the stick receives a scan response for panId "ABCD" from device "ABCDEF" of type 25
+
+    Scenario: Send scan request
+      When I ask the stick to scan the network for panId "ABCD"
+      Then the stick responds without errors
+
+    Scenario: Send scan request - force stick timeout
+      When I ask the stick to scan the network for panId "DED1"
+      Then the stick responds negatively
+
+    Scenario: Send scan response
       When I ask the stick to respond to a scan for panId "ABCD" from device "ABCDEF"
       Then the stick responds without errors
 
-    Scenario: Scan response - force stick timeout
+    Scenario: Send scan response - force stick timeout
       When I ask the stick to respond to a scan for panId "ABCD" from device "DEAD01"
       Then the stick responds negatively
 
-    Scenario: Scan response - force network timeout
+    Scenario: Send scan response - force network timeout
       When I ask the stick to respond to a scan for panId "ABCD" from device "DEAD02"
       Then the stick responds negatively
 

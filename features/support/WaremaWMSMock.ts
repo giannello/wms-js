@@ -53,9 +53,10 @@ class WaremaWMSMock {
                 const requestType = framePayload.substring(0, 2);
                 const serial = framePayload.substring(2, 8);
                 const messageType = framePayload.substring(8, 12);
+                const panId = framePayload.substring(12, 16);
 
                 // Simulate stick and network timeout
-                if (serial === 'DEAD01') {
+                if (serial === 'DEAD01' || (messageType === '7020' && panId === 'DED1')) {
                     return;
                 }
                 this.mockedPort.port?.emitData(`{a}`);
@@ -64,6 +65,8 @@ class WaremaWMSMock {
                 }
                 const requestCombination = [requestType, messageType, serial].join('-');
                 switch (requestCombination) {
+                    case '04-7020-FFFFFF':
+                        break;
                     case '06-7050-ABCDEF':
                     case '01-7021-ABCDEF':
                         response = 'rABCDEF50ACABCD'
@@ -87,7 +90,9 @@ class WaremaWMSMock {
             default:
                 throw new Error(`Unhandled frame type: ${frameType}`);
         }
-        this.mockedPort.port?.emitData(`{${response}}`);
+        if (response) {
+            this.mockedPort.port?.emitData(`{${response}}`);
+        }
     }
 
     mockNetworkJoin(serial: string, channel: string, panId: string, encryptionKey: string): void {
@@ -108,6 +113,10 @@ class WaremaWMSMock {
 
     mockWeatherBroadcast(serial: string, windSpeed: string): void {
         this.mockedPort.port?.emitData(`{r${serial}7080FF${windSpeed}FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}`);
+    }
+
+    mockReceivedScanResponse(serial: string, deviceType: number, panId: string): void {
+        this.mockedPort.port?.emitData(`{r${serial}7021${panId}${deviceType}8C2F000300000000000000000A04000100C1000000000000}`);
     }
 }
 
