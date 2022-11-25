@@ -34,7 +34,7 @@
     "serialport": "10.5.0"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "8.8.0",
+    "@cucumber/cucumber": "8.9.0",
     "@tsconfig/node16-strictest-esm": "1.0.3",
     "c8": "7.12.0",
     "nodemon": "2.0.20",
