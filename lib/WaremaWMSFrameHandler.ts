@@ -118,7 +118,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
                         emitPayload = <WaremaWMSMessageBroadcastNetworkParametersChange>{
                             serial,
                             panId: messagePayload.slice(0, 4),
-                            channel: WaremaWMSUtils.hexToDec(messagePayload.slice(6, 8)),
+                            channel: parseInt(messagePayload.slice(6, 8)),
                         }
                         break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_BROADCAST_WEATHER:
@@ -151,7 +151,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
                             serial,
                             panId: messagePayload.slice(0, 4),
                             encryptionKey: WaremaWMSUtils.reverseHex(messagePayload.slice(4, 36)),
-                            channel: WaremaWMSUtils.hexToDec(messagePayload.slice(38, 40)),
+                            channel: parseInt(messagePayload.slice(38, 40)),
                         }
                         break
                     case WaremaWMSFrameHandler.MESSAGE_TYPE_DEVICE_MOVE_TO_POSITION_RESPONSE:
