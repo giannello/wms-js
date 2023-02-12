@@ -1,6 +1,6 @@
 {
   "name": "wms-js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Interface to a Warema WMS network using a Warema WMS stick",
   "keywords": [
     "warema",

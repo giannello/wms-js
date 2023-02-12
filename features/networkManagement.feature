@@ -35,23 +35,28 @@ Feature: Network management
 
     Scenario: Send scan request
       When I ask the stick to scan the network for panId "ABCD"
-      Then the stick responds without errors
+      Then the stick sends a scan request for panId "ABCD"
+       And the stick responds without errors
 
     Scenario: Send scan request - force stick timeout
       When I ask the stick to scan the network for panId "DED1"
-      Then the stick responds negatively
+      Then the stick sends a scan request for panId "DED1"
+       And the stick responds negatively
 
     Scenario: Send scan response
       When I ask the stick to respond to a scan for panId "ABCD" from device "ABCDEF"
-      Then the stick responds without errors
+      Then the stick sends a scan response for panId "ABCD" from device "ABCDEF"
+       And the stick responds without errors
 
     Scenario: Send scan response - force stick timeout
       When I ask the stick to respond to a scan for panId "ABCD" from device "DEAD01"
-      Then the stick responds negatively
+      Then the stick sends a scan response for panId "ABCD" from device "DEAD01"
+       And the stick responds negatively
 
     Scenario: Send scan response - force network timeout
       When I ask the stick to respond to a scan for panId "ABCD" from device "DEAD02"
-      Then the stick responds negatively
+      Then the stick sends a scan response for panId "ABCD" from device "DEAD02"
+       And the stick responds negatively
 
     Scenario: Network join request
       When the device "ABCDEF" sends a network join request for channel 12 and panId "BEEF" with encryption key "12345678123456781234567812345678"
