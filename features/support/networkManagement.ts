@@ -60,6 +60,18 @@ When('I ask the stick to scan the network for panId {string}', async function (p
     }
 })
 
+Then('the stick sends a scan request for panId {string}', async function (panId) {
+    const expectedResponse = `{R04FFFFFF7020${panId}02}`;
+    const actualResponse = await this['wmsMock'].getLastSentMessage();
+    assert.strictEqual(actualResponse, expectedResponse);
+});
+
+Then('the stick sends a scan response for panId {string} from device {string}', async function (panId, serial) {
+    const expectedResponse = `{R01${serial}7021${panId}02}`;
+    const actualResponse = await this['wmsMock'].getLastSentMessage();
+    assert.strictEqual(actualResponse, expectedResponse);
+});
+
 When('the device {string} of type {int} sends a scan response for panId {string}', async function (serial, deviceType, panId) {
     this['wmsMock'].mockReceivedScanResponse(serial, deviceType, panId);
 })

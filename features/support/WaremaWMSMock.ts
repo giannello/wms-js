@@ -30,6 +30,12 @@ class WaremaWMSMock {
         }
     }
 
+    async getLastSentMessage(): Promise<string|undefined> {
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+        await delay(500);
+        return this.mockedPort.port?.lastWrite?.toString();
+    }
+
     mockResponse(): void {
         const receivedFrame = this.mockedPort.port?.lastWrite?.toString();
         if (!receivedFrame) {

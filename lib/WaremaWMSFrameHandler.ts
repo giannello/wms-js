@@ -228,7 +228,7 @@ class WaremaWMSFrameHandler extends EventEmitter {
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}04FFFFFF${WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_REQUEST}${payload!.panId}${DEVICE_TYPE_STICK.toString().padStart(2, '0')}`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE:
-                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}01${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE}FFFF02`;
+                frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}01${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_SCAN_RESPONSE}${payload!.panId}02`;
                 break;
             case WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST:
                 frame = `${WaremaWMSFrameHandler.FRAME_TYPE_MESSAGE_REQUEST}06${payload!.serial!}${WaremaWMSFrameHandler.MESSAGE_TYPE_WAVE_REQUEST}`;
