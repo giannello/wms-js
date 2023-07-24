@@ -31,7 +31,7 @@
     "test-watch": "NODE_OPTIONS='--loader ts-node/esm' nodemon --exec c8 cucumber-js"
   },
   "dependencies": {
-    "serialport": "10.5.0"
+    "serialport": "11.0.0"
   },
   "devDependencies": {
     "@cucumber/cucumber": "8.11.1",
