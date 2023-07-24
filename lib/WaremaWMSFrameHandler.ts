@@ -14,7 +14,7 @@ import type {
     WaremaWMSMessageDeviceStatus,
     WaremaWMSMessageNetworkJoin,
     WaremaWMSMessageWaveRequest,
-} from "./WaremaWMSFrame";
+} from "./WaremaWMSFrame.js";
 import WaremaWMSUtils from "./WaremaWMSUtils.js";
 import {DEVICE_TYPE_STICK} from "./WaremaWMSDevice.js";
 

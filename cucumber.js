@@ -1,6 +1,6 @@
 export default {
     publishQuiet: true,
     import: [
-        'features/support/*.ts',
+        'dist/features/support/*.js',
     ],
 }

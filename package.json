@@ -26,27 +26,25 @@
   ],
   "scripts": {
     "build": "tsc --build",
-    "test": "NODE_OPTIONS='--loader ts-node/esm' c8 cucumber-js",
-    "test-debug": "NODE_OPTIONS='--loader ts-node/esm --inspect-brk=0.0.0.0' cucumber-js",
-    "test-watch": "NODE_OPTIONS='--loader ts-node/esm' nodemon --exec c8 cucumber-js"
+    "test": "c8 cucumber-js",
+    "test-debug": "NODE_OPTIONS='--inspect-brk=0.0.0.0' cucumber-js",
+    "test-watch": "tsc-watch --onSuccess 'c8 cucumber-js'"
   },
   "dependencies": {
     "serialport": "11.0.0"
   },
   "devDependencies": {
     "@cucumber/cucumber": "9.3.0",
-    "@tsconfig/node16-strictest-esm": "1.0.3",
+    "@tsconfig/node20": "^20.1.0",
+    "@tsconfig/strictest": "^2.0.1",
+    "@types/node": "^20.4.4",
     "c8": "8.0.0",
-    "nodemon": "3.0.1",
-    "ts-node": "10.9.1",
+    "tsc-watch": "^6.0.4",
     "typescript": "5.1.6"
   },
   "c8": {
     "include": [
       "lib/"
     ]
-  },
-  "nodemonConfig": {
-    "ext": "ts,feature"
   }
 }
