@@ -37,7 +37,7 @@
     "@cucumber/cucumber": "10.3.1",
     "@tsconfig/node16-strictest-esm": "1.0.3",
     "c8": "9.1.0",
-    "nodemon": "3.1.0",
+    "nodemon": "3.1.14",
     "ts-node": "10.9.2",
     "typescript": "5.4.2"
   },
