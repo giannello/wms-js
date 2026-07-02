@@ -1,5 +1,7 @@
 import { RadioController } from "../controller.js"
 import { ackMatch } from "../command/ack-match.js"
+import { deviceScanResponseMatcher } from "../parsers/device-scan-response.js"
+import type { DeviceScanResponse } from "../parsers/device-scan-response.js"
 
 export interface NetworkParams {
   receiveBroadcasts: boolean
@@ -98,5 +100,43 @@ export class Commands {
     if (ack.kind === "timeout") {
       throw new Error("setEncryptionKey: ack timeout")
     }
+  }
+
+  // NOTE: responseWindowMs consumes ALL serial frames during the scan window,
+  // suppressing broadcast handlers (weather station, pairing, etc.). This is
+  // acceptable because scanning is infrequent and short-lived (~3s).
+  async scanNetwork(panId: string, timeoutMs = 3000): Promise<DeviceScanResponse[]> {
+    if (!/^[0-9A-Fa-f]{4}$/.test(panId)) {
+      throw new Error("scanNetwork: invalid PAN ID")
+    }
+
+    const responses: DeviceScanResponse[] = []
+    const frame = `R04FFFFFF7020${panId.toUpperCase()}02`
+
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs,
+    })
+
+    session.onResponse((content) => {
+      const parsed = deviceScanResponseMatcher(content)
+      if (parsed) {
+        responses.push(parsed)
+      }
+    })
+
+    const ack = await session.ack
+
+    if (ack.kind === "fail") {
+      throw new Error("scanNetwork: command rejected")
+    }
+
+    if (ack.kind === "timeout") {
+      throw new Error("scanNetwork: ack timeout")
+    }
+
+    await session.promise
+
+    return responses
   }
 }

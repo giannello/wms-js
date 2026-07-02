@@ -62,12 +62,15 @@ Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
 | `deviceScanMatcher` | `parsers/device-scan.ts` | `7020` | Remote scan query |
 | `waveRequestMatcher` | `parsers/wave-request.ts` | `7050` | Wave request (key exchange step) |
 | `networkJoinMatcher` | `parsers/network-join.ts` | `5018` | Network key share (key is byte-reversed) |
+| `deviceScanResponseMatcher` | `parsers/device-scan-response.ts` | `7021` | Scan response (from `--scan` probe) |
 
 ### CLI behaviour
 - Normal mode: logs `[>>]` writes, `[<<]` broadcasts, `[WS]`, `[NET]`, `[SCN]`, `[WAV]`, `[KEY]`
 - `--discover`: listens on channel 18; on `5060` broadcast, auto-switches to discovered channel/PAN ID; rejects `--channel`, `--pan-id`, `--key`
 - Scan response (`7020`): answered with `R01<serial>7021FFFF02` (hardcoded PAN ID)
 - Network join (`5018`): prints serial, PAN ID, channel, key then exits
+
+**Scan response window**: `Commands.scanNetwork()` uses `responseWindowMs` to collect `7021` broadcast responses. During this window (~3s), all serial frames are consumed by the active command session — broadcasts (weather station, pairing, etc.) are suppressed. This is acceptable because scanning is infrequent and short-lived.
 
 ## Packages
 | Package | Entry point | Role |
