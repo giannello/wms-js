@@ -15,8 +15,17 @@ Docker (or Podman with docker-compose compatibility) — that's it.
 ```sh
 docker compose run --rm web sh -c \
   "npx tsx packages/cli/src/index.ts --port /dev/ttyUSB0 --channel 18"
+docker compose run --rm web sh -c \
+  "npx tsx packages/cli/src/index.ts --port /dev/ttyUSB0 --discover"
 ```
 The `web` service mounts `/dev:/dev` in `compose.yml` for USB access.
+
+### CLI options
+- `--port <path>` — serial port (required)
+- `--channel <n>` — radio channel 11-26 (required unless `--discover`)
+- `--pan-id <XXXX>` — PAN ID hex, default FFFF (rejected with `--discover`)
+- `--key <hex>` — 32-char hex key (rejected with `--discover`)
+- `--discover` — listen for a remote pairing broadcast, auto-switch to its network
 
 ## Running services
 - `docker compose up -d mosquitto` — start MQTT broker
@@ -43,7 +52,22 @@ Defined in `packages/lib/src/serial/driver.ts`. Implementations:
 
 ## Protocol
 Frames are `{...}` delimited. `{f}` = command rejected, `{a}` = success.
-Full spec in `PROTOCOL.md`.
+Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
+
+### Parsers (all compact, no spaces)
+| Parser | File | Message type | Description |
+|--------|------|-------------|-------------|
+| `weatherStationMatcher` | `parsers/weather-station.ts` | `7080` | Wind speed broadcast |
+| `networkParamsMatcher` | `parsers/network-params.ts` | `5060` | Remote pairing broadcast |
+| `deviceScanMatcher` | `parsers/device-scan.ts` | `7020` | Remote scan query |
+| `waveRequestMatcher` | `parsers/wave-request.ts` | `7050` | Wave request (key exchange step) |
+| `networkJoinMatcher` | `parsers/network-join.ts` | `5018` | Network key share (key is byte-reversed) |
+
+### CLI behaviour
+- Normal mode: logs `[>>]` writes, `[<<]` broadcasts, `[WS]`, `[NET]`, `[SCN]`, `[WAV]`, `[KEY]`
+- `--discover`: listens on channel 18; on `5060` broadcast, auto-switches to discovered channel/PAN ID; rejects `--channel`, `--pan-id`, `--key`
+- Scan response (`7020`): answered with `R01<serial>7021FFFF02` (hardcoded PAN ID)
+- Network join (`5018`): prints serial, PAN ID, channel, key then exits
 
 ## Packages
 | Package | Entry point | Role |

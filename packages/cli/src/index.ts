@@ -1,4 +1,4 @@
-import { RadioController, Commands, weatherStationMatcher } from "@warema/lib"
+import { RadioController, Commands, weatherStationMatcher, networkParamsMatcher, deviceScanMatcher, waveRequestMatcher, networkJoinMatcher } from "@warema/lib"
 import { NodeSerialDriver } from "./node-serial.js"
 
 function timestamp(): string {
@@ -10,13 +10,15 @@ function timestamp(): string {
 }
 
 function usage(): never {
-  console.error(`Usage: tsx packages/cli/src/index.ts --port <path> --channel <n> [options]
+  console.error(`Usage: tsx packages/cli/src/index.ts --port <path> ( --channel <n> | --discover ) [options]
 
 Options:
   --port <path>       Serial port path (e.g. /dev/ttyUSB0)
   --channel <n>       Radio channel (11-26)
   --pan-id <XXXX>     PAN ID in hex, defaults to FFFF
   --key <hex>         32-char hex encryption key (optional, for encrypted networks)
+  --discover          Listen for a remote pairing broadcast to detect and switch to
+                      the remote's network (ignores --channel, --pan-id, --key)
   --help              Show this help
 `)
   process.exit(1)
@@ -27,6 +29,7 @@ function parseArgs(): {
   channel: number
   panId: string
   key: string | undefined
+  discover: boolean
 } {
   const args = process.argv.slice(2)
   if (args.length === 0 || args.includes("--help")) usage()
@@ -35,6 +38,9 @@ function parseArgs(): {
   let channel = 0
   let panId = "FFFF"
   let key: string | undefined
+  let discover = false
+  let channelSet = false
+  let panIdSet = false
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -43,12 +49,17 @@ function parseArgs(): {
         break
       case "--channel":
         channel = Number(args[++i])
+        channelSet = true
         break
       case "--pan-id":
         panId = args[++i] ?? "FFFF"
+        panIdSet = true
         break
       case "--key":
         key = args[++i]
+        break
+      case "--discover":
+        discover = true
         break
       default:
         console.error(`Unknown option: ${args[i]}`)
@@ -61,7 +72,9 @@ function parseArgs(): {
     usage()
   }
 
-  if (channel < 11 || channel > 26) {
+  if (discover) {
+    if (channel === 0) channel = 18
+  } else if (channel < 11 || channel > 26) {
     console.error("Error: --channel must be between 11 and 26")
     usage()
   }
@@ -76,11 +89,26 @@ function parseArgs(): {
     usage()
   }
 
-  return { port, channel, panId: panId.toUpperCase(), key }
+  if (discover && channelSet) {
+    console.error("Error: --discover mode does not accept --channel")
+    usage()
+  }
+
+  if (discover && panIdSet) {
+    console.error("Error: --discover mode does not accept --pan-id")
+    usage()
+  }
+
+  if (discover && key !== undefined) {
+    console.error("Error: --discover mode does not accept --key")
+    usage()
+  }
+
+  return { port, channel, panId: panId.toUpperCase(), key, discover }
 }
 
 async function main(): Promise<void> {
-  const { port, channel, panId, key } = parseArgs()
+  const { port, channel, panId, key, discover } = parseArgs()
 
   const driver = new NodeSerialDriver()
   const radio = new RadioController(driver)
@@ -122,6 +150,11 @@ async function main(): Promise<void> {
       panId,
     })
     console.log(`${timestamp()} [INF] Network configured: channel ${channel}, PAN ID ${panId}`)
+
+  if (discover) {
+    console.log(`${timestamp()} [INF] Discovery mode: press the L button on a remote to scan`)
+    console.log(`${timestamp()} [INF] The remote will broadcast its network parameters`)
+  }
   } catch (e) {
     console.error(`${timestamp()} [ERR] Failed to configure network: ${(e as Error).message}`)
     await radio.close()
@@ -139,12 +172,58 @@ async function main(): Promise<void> {
     }
   }
 
-  radio.onBroadcast((frame) => {
+  radio.onBroadcast(async (frame) => {
     console.log(`${timestamp()} [<<] {${frame}}`)
 
     const ws = weatherStationMatcher(frame)
     if (ws) {
       console.log(`${timestamp()} [WS]  ${ws.serialNumber}  wind=${ws.windSpeed} km/h`)
+    }
+
+    const np = networkParamsMatcher(frame)
+    if (np) {
+      if (discover) {
+        const ch = np.channel
+        console.log(`${timestamp()} [NET] Switching to channel ${ch}, PAN ID ${np.panId}`)
+        try {
+          await commands.setNetworkParameters({
+            receiveBroadcasts: true,
+            channel: ch,
+            panId: np.panId,
+          })
+          console.log(`${timestamp()} [NET] Switch succeeded`)
+        } catch (e) {
+          console.error(`${timestamp()} [NET] Switch failed: ${(e as Error).message}`)
+        }
+      } else {
+        console.log(`${timestamp()} [NET] ${np.serialNumber}  PAN ID=${np.panId}  channel=${np.channel}`)
+      }
+    }
+
+    const sq = deviceScanMatcher(frame)
+    if (sq) {
+      console.log(`${timestamp()} [SCN] ${sq.serialNumber}  PAN ID=${sq.panId}  → answering`)
+      const cmd = `R01${sq.serialNumber}7021FFFF02`
+      radio.send(cmd, {
+        ackMatcher: () => null,
+        ackTimeoutMs: 0,
+        responseWindowMs: 0,
+      })
+    }
+
+    const wr = waveRequestMatcher(frame)
+    if (wr) {
+      console.log(`${timestamp()} [WAV] ${wr.serialNumber}  wave request received`)
+    }
+
+    const nj = networkJoinMatcher(frame)
+    if (nj) {
+      console.log(`${timestamp()} [KEY] Remote serial:  ${nj.serialNumber}`)
+      console.log(`${timestamp()} [KEY] PAN ID:          ${nj.panId}`)
+      console.log(`${timestamp()} [KEY] Channel:         ${nj.channel}`)
+      console.log(`${timestamp()} [KEY] Encryption key:  ${nj.key}`)
+      await radio.close()
+      process.exit(0)
     }
   })
 
