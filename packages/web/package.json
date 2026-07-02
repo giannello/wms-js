@@ -4,7 +4,9 @@
   "main": "dist/packages/web/src/index.js",
   "types": "dist/packages/web/src/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "build:discovery": "esbuild src/ui.tsx --bundle --outfile=public/discovery-bundle.js --format=esm --platform=browser --jsx=automatic --external:react --external:react-dom",
+    "build:home": "esbuild src/home.tsx --bundle --outfile=public/home-bundle.js --format=esm --platform=browser --jsx=automatic --external:react --external:react-dom"
   },
   "dependencies": {
     "@warema/lib": "*"
