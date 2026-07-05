@@ -246,7 +246,7 @@ export async function startMonitor(
   port: WMSerialPort,
   params: MonitorParams,
   onEvent: (event: DiscoveryEvent) => void,
-): Promise<void> {
+): Promise<{ commands: Commands }> {
   const driver = new WebSerialDriver(port)
   const radio = new RadioController(driver)
   const commands = new Commands(radio)
@@ -305,4 +305,6 @@ export async function startMonitor(
       })
     }
   })
+
+  return { commands }
 }

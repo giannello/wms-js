@@ -298,6 +298,20 @@ var RadioController = class {
   }
 };
 
+// ../lib/src/parsers/device-scan-response.ts
+function deviceScanResponseMatcher(frame) {
+  if (frame.length < 57) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "7021") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
+    panId: frame.slice(11, 15),
+    deviceType: frame.slice(15, 17),
+    unknown: frame.slice(17, 57),
+    raw: frame
+  };
+}
+
 // ../lib/src/commands/name.ts
 var Commands = class {
   constructor(radio) {
@@ -370,6 +384,35 @@ var Commands = class {
     if (ack.kind === "timeout") {
       throw new Error("setEncryptionKey: ack timeout");
     }
+  }
+  // NOTE: responseWindowMs consumes ALL serial frames during the scan window,
+  // suppressing broadcast handlers (weather station, pairing, etc.). This is
+  // acceptable because scanning is infrequent and short-lived (~3s).
+  async scanNetwork(panId, timeoutMs = 3e3) {
+    if (!/^[0-9A-Fa-f]{4}$/.test(panId)) {
+      throw new Error("scanNetwork: invalid PAN ID");
+    }
+    const responses = [];
+    const frame = `R04FFFFFF7020${panId.toUpperCase()}02`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    session.onResponse((content) => {
+      const parsed = deviceScanResponseMatcher(content);
+      if (parsed) {
+        responses.push(parsed);
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("scanNetwork: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("scanNetwork: ack timeout");
+    }
+    await session.promise;
+    return responses;
   }
 };
 
@@ -525,6 +568,7 @@ async function startMonitor(port, params, onEvent) {
       });
     }
   });
+  return { commands };
 }
 
 // src/home.tsx
@@ -533,6 +577,10 @@ function App() {
   const [stations, setStations] = React.useState(/* @__PURE__ */ new Map());
   const [status, setStatus] = React.useState("connect");
   const [error, setError] = React.useState("");
+  const commandsRef = React.useRef(null);
+  const [scanning, setScanning] = React.useState(false);
+  const [scanDevices, setScanDevices] = React.useState([]);
+  const [scanError, setScanError] = React.useState("");
   const handleConnect = async () => {
     try {
       const p = await navigator.serial.requestPort({
@@ -546,7 +594,7 @@ function App() {
       }
       const params = JSON.parse(stored);
       setStatus("connecting");
-      await startMonitor(p, params, (evt) => {
+      const { commands } = await startMonitor(p, params, (evt) => {
         if (evt.type === "connected") {
           setStatus("monitoring");
         }
@@ -563,8 +611,27 @@ function App() {
           setStatus("error");
         }
       });
+      commandsRef.current = commands;
     } catch {
     }
+  };
+  const handleScan = async () => {
+    if (!commandsRef.current) return;
+    const stored = localStorage.getItem("wms-network-params");
+    if (!stored) {
+      setScanError("No network parameters found");
+      return;
+    }
+    const params = JSON.parse(stored);
+    setScanning(true);
+    setScanError("");
+    try {
+      const results = await commandsRef.current.scanNetwork(params.panId);
+      setScanDevices(results);
+    } catch (e) {
+      setScanError(e.message);
+    }
+    setScanning(false);
   };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
@@ -596,7 +663,25 @@ function App() {
         s.windSpeed,
         " km/h"
       ] })
-    ] }, s.serialNumber))
+    ] }, s.serialNumber)),
+    status === "monitoring" && /* @__PURE__ */ jsxs("div", { className: "space-y-3 pt-2", children: [
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleScan,
+          disabled: scanning,
+          className: "px-6 py-3 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded-lg font-semibold text-sm transition-colors",
+          children: scanning ? "Scanning..." : "Scan Network"
+        }
+      ),
+      scanError && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: scanError }),
+      scanDevices.map((d) => /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-violet-700 rounded-lg p-4", children: [
+        /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
+        /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: d.serialNumber }),
+        /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide mt-3", children: "Device Type" }),
+        /* @__PURE__ */ jsx("div", { className: "text-violet-400 font-bold text-2xl mt-1", children: d.deviceType })
+      ] }, d.serialNumber))
+    ] })
   ] });
 }
 var root = document.getElementById("root");

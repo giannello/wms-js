@@ -1,6 +1,7 @@
 import React from "react"
 import { createRoot } from "react-dom/client"
 import { startMonitor, type DiscoveryEvent } from "./browser.js"
+import type { DeviceScanResponse } from "@warema/lib"
 
 type StationData = { serialNumber: string; windSpeed: number }
 
@@ -8,6 +9,10 @@ function App() {
   const [stations, setStations] = React.useState<Map<string, StationData>>(new Map())
   const [status, setStatus] = React.useState<"connect" | "connecting" | "monitoring" | "error">("connect")
   const [error, setError] = React.useState("")
+  const commandsRef = React.useRef<{ scanNetwork: (panId: string) => Promise<DeviceScanResponse[]> } | null>(null)
+  const [scanning, setScanning] = React.useState(false)
+  const [scanDevices, setScanDevices] = React.useState<DeviceScanResponse[]>([])
+  const [scanError, setScanError] = React.useState("")
 
   const handleConnect = async () => {
     try {
@@ -25,7 +30,7 @@ function App() {
       const params = JSON.parse(stored)
       setStatus("connecting")
 
-      await startMonitor(p, params, (evt) => {
+      const { commands } = await startMonitor(p, params, (evt) => {
         if (evt.type === "connected") {
           setStatus("monitoring")
         }
@@ -42,9 +47,29 @@ function App() {
           setStatus("error")
         }
       })
+      commandsRef.current = commands
     } catch {
       // user cancelled port picker
     }
+  }
+
+  const handleScan = async () => {
+    if (!commandsRef.current) return
+    const stored = localStorage.getItem("wms-network-params")
+    if (!stored) {
+      setScanError("No network parameters found")
+      return
+    }
+    const params = JSON.parse(stored) as { panId: string }
+    setScanning(true)
+    setScanError("")
+    try {
+      const results = await commandsRef.current.scanNetwork(params.panId)
+      setScanDevices(results)
+    } catch (e) {
+      setScanError((e as Error).message)
+    }
+    setScanning(false)
   }
 
   return (
@@ -86,6 +111,31 @@ function App() {
           <div className="text-emerald-400 font-bold text-2xl mt-1">{s.windSpeed} km/h</div>
         </div>
       ))}
+
+      {status === "monitoring" && (
+        <div className="space-y-3 pt-2">
+          <button
+            onClick={handleScan}
+            disabled={scanning}
+            className="px-6 py-3 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded-lg font-semibold text-sm transition-colors"
+          >
+            {scanning ? "Scanning..." : "Scan Network"}
+          </button>
+
+          {scanError && (
+            <div className="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">{scanError}</div>
+          )}
+
+          {scanDevices.map((d) => (
+            <div key={d.serialNumber} className="bg-gray-900 border border-violet-700 rounded-lg p-4">
+              <div className="text-gray-400 text-xs uppercase tracking-wide">Serial</div>
+              <div className="text-white font-semibold mt-1">{d.serialNumber}</div>
+              <div className="text-gray-400 text-xs uppercase tracking-wide mt-3">Device Type</div>
+              <div className="text-violet-400 font-bold text-2xl mt-1">{d.deviceType}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
