@@ -11,7 +11,7 @@ describe("deviceStatusMatcher", () => {
     expect(result!.deviceType).toBe("05")
     expect(result!.deviceTypeName).toBe("Unknown")
     expect(result!.position).toBe(0)
-    expect(result!.inclination).toBe(255)
+    expect(result!.inclination).toBe(128)
     expect(result!.valance1).toBe(255)
     expect(result!.valance2).toBe(255)
     expect(result!.moving).toBe(false)

@@ -76,10 +76,10 @@ export async function startDiscovery(
     onEvent({
       type: "error",
       timestamp: ts(),
-      message: `Failed to get stick name: ${(e as Error).message}`,
+      message: `Failed to configure network: ${(e as Error).message}`,
     })
     await radio.close()
-    return
+    throw new Error("Failed to configure network")
   }
 
   onEvent({ type: "connected", timestamp: ts() })
@@ -276,7 +276,7 @@ export async function startMonitor(
       message: `Failed to configure network: ${(e as Error).message}`,
     })
     await radio.close()
-    return
+    throw new Error("Failed to configure network")
   }
 
   try {
@@ -289,7 +289,7 @@ export async function startMonitor(
       message: `Failed to set encryption key: ${(e as Error).message}`,
     })
     await radio.close()
-    return
+    throw new Error("Failed to set encryption key")
   }
 
   onEvent({ type: "connected", timestamp: ts() })

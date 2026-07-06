@@ -23,7 +23,7 @@ export function deviceStatusMatcher(frame: string): DeviceStatus | null {
     deviceType,
     deviceTypeName: getDeviceTypeName(deviceType),
     position: Math.round(parseInt(frame.slice(19, 21), 16) / 2),
-    inclination: parseInt(frame.slice(21, 23), 16),
+    inclination: parseInt(frame.slice(21, 23), 16) - 127,
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",

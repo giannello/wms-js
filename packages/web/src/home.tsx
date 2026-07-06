@@ -40,6 +40,8 @@ function App() {
     scanNetwork: (panId: string) => Promise<DeviceScanResponse[]>
     getDeviceStatus: (serialNumber: string) => Promise<DeviceStatus>
     waveDevice: (serialNumber: string) => Promise<{ serialNumber: string; code?: string }>
+    stopDevice: (serialNumber: string) => Promise<{ serialNumber: string; previousPosition: number; previousInclination: number }>
+    moveToPosition: (serialNumber: string, position: number, inclination?: number) => Promise<{ serialNumber: string; previousPosition: number; previousInclination: number }>
   } | null>(null)
   const [scanning, setScanning] = React.useState(false)
   const [scanDevices, setScanDevices] = React.useState<DeviceScanResponse[]>([])
@@ -53,6 +55,8 @@ function App() {
   const [hiddenSerials, setHiddenSerials] = React.useState<Set<string>>(loadHidden)
   const [wavingSerial, setWavingSerial] = React.useState("")
   const [waveMessages, setWaveMessages] = React.useState<Map<string, string>>(new Map())
+  const [movingSerial, setMovingSerial] = React.useState("")
+  const [moveMessages, setMoveMessages] = React.useState<Map<string, string>>(new Map())
 
   const handleConnect = async () => {
     try {
@@ -162,7 +166,7 @@ function App() {
     for (const r of results) {
       if ("status" in r) {
         ok++
-        newStatuses.set(r.serial, r.status)
+        if (r.status) newStatuses.set(r.serial, r.status)
       } else {
         fail++
         newErrors.set(r.serial, r.error)
@@ -236,6 +240,31 @@ function App() {
       setWaveMessages((prev) => new Map(prev).set(serial, `Wave failed: ${(err as Error).message}`))
     }
     setWavingSerial("")
+  }
+
+  const handleMove = async (serial: string, position: number) => {
+    if (!commandsRef.current) return
+    setMovingSerial(serial)
+    try {
+      if (position === -1) {
+        await commandsRef.current.stopDevice(serial)
+        setMoveMessages((prev) => new Map(prev).set(serial, "Stopped"))
+      } else {
+        await commandsRef.current.moveToPosition(serial, position)
+        const label = position === 100 ? "Up" : "Down"
+        setMoveMessages((prev) => new Map(prev).set(serial, `Moving ${label}...`))
+      }
+      const status = await commandsRef.current.getDeviceStatus(serial)
+      setDeviceStatuses((prev) => new Map(prev).set(serial, status))
+      setStatusErrors((prev) => {
+        const next = new Map(prev)
+        next.delete(serial)
+        return next
+      })
+    } catch (err) {
+      setMoveMessages((prev) => new Map(prev).set(serial, `Move failed: ${(err as Error).message}`))
+    }
+    setMovingSerial("")
   }
 
   return (
@@ -386,6 +415,39 @@ function App() {
                     </div>
                   </div>
                 )}
+                {(() => {
+                  const mm = moveMessages.get(d.serialNumber)
+                  if (!mm) return null
+                  const ok = !mm.startsWith("Move failed")
+                  return (
+                    <div className={`mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`}>
+                      {mm}
+                    </div>
+                  )
+                })()}
+                <div className="mt-3 pt-3 border-t border-gray-700 flex gap-2">
+                  <button
+                    onClick={() => handleMove(d.serialNumber, 100)}
+                    disabled={movingSerial === d.serialNumber}
+                    className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors"
+                  >
+                    ▲ Up
+                  </button>
+                  <button
+                    onClick={() => handleMove(d.serialNumber, 0)}
+                    disabled={movingSerial === d.serialNumber}
+                    className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors"
+                  >
+                    ▼ Down
+                  </button>
+                  <button
+                    onClick={() => handleMove(d.serialNumber, -1)}
+                    disabled={movingSerial === d.serialNumber}
+                    className="flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-red-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors"
+                  >
+                    ■ Stop
+                  </button>
+                </div>
               </div>
             )
           })}

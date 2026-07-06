@@ -1,8 +1,8 @@
-// src/home.tsx
+// packages/web/src/home.tsx
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-// ../lib/src/frame/errors.ts
+// packages/lib/src/frame/errors.ts
 var MalformedFrameError = class extends Error {
   partial;
   constructor(partial) {
@@ -12,7 +12,7 @@ var MalformedFrameError = class extends Error {
   }
 };
 
-// ../lib/src/frame/parser.ts
+// packages/lib/src/frame/parser.ts
 var decoder = new TextDecoder("utf-8", { fatal: false });
 var FrameParser = class {
   buffer = "";
@@ -81,13 +81,13 @@ var FrameParser = class {
   }
 };
 
-// ../lib/src/frame/serializer.ts
+// packages/lib/src/frame/serializer.ts
 var encoder = new TextEncoder();
 function serializeFrame(content) {
   return encoder.encode(`{${content}}`);
 }
 
-// ../lib/src/command/session.ts
+// packages/lib/src/command/session.ts
 var CommandSession = class {
   command;
   ack;
@@ -182,7 +182,7 @@ var CommandSession = class {
   }
 };
 
-// ../lib/src/command/ack-match.ts
+// packages/lib/src/command/ack-match.ts
 var ackMatch = {
   exact(type) {
     return (frame) => frame === type ? "" : null;
@@ -192,7 +192,7 @@ var ackMatch = {
   }
 };
 
-// ../lib/src/controller.ts
+// packages/lib/src/controller.ts
 var RadioController = class {
   driver;
   parser = new FrameParser();
@@ -302,7 +302,7 @@ var RadioController = class {
   }
 };
 
-// ../lib/src/parsers/device-scan-response.ts
+// packages/lib/src/parsers/device-scan-response.ts
 var DEVICE_TYPE_NAMES = {
   "25": "Awning"
 };
@@ -324,7 +324,7 @@ function deviceScanResponseMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/device-status.ts
+// packages/lib/src/parsers/device-status.ts
 function deviceStatusMatcher(frame) {
   if (frame.length < 29) return null;
   if (frame[0] !== "r") return null;
@@ -335,7 +335,7 @@ function deviceStatusMatcher(frame) {
     deviceType,
     deviceTypeName: getDeviceTypeName(deviceType),
     position: Math.round(parseInt(frame.slice(19, 21), 16) / 2),
-    inclination: parseInt(frame.slice(21, 23), 16),
+    inclination: parseInt(frame.slice(21, 23), 16) - 127,
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",
@@ -343,7 +343,7 @@ function deviceStatusMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/wave-response.ts
+// packages/lib/src/parsers/wave-response.ts
 function waveResponseMatcher(frame) {
   if (frame.length < 15) return null;
   if (frame[0] !== "r") return null;
@@ -355,7 +355,7 @@ function waveResponseMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/wave-request.ts
+// packages/lib/src/parsers/wave-request.ts
 function waveRequestMatcher(frame) {
   if (frame.length < 11) return null;
   if (frame[0] !== "r") return null;
@@ -366,7 +366,20 @@ function waveRequestMatcher(frame) {
   };
 }
 
-// ../lib/src/commands/name.ts
+// packages/lib/src/parsers/move-response.ts
+function moveResponseMatcher(frame) {
+  if (frame.length < 25) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "7071") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
+    previousPosition: Math.round(parseInt(frame.slice(21, 23), 16) / 2),
+    previousInclination: parseInt(frame.slice(23, 25), 16) - 127,
+    raw: frame
+  };
+}
+
+// packages/lib/src/commands/name.ts
 var Commands = class {
   constructor(radio) {
     this.radio = radio;
@@ -533,9 +546,54 @@ var Commands = class {
     }
     return result;
   }
+  async stopDevice(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("stopDevice: invalid serial number");
+    }
+    const cmd = `R06${serialNumber.toUpperCase()}707001`;
+    return this.sendMoveCommand(cmd, timeoutMs);
+  }
+  async moveToPosition(serialNumber, position, inclination = 0, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("moveToPosition: invalid serial number");
+    }
+    if (position < 0 || position > 100) {
+      throw new Error("moveToPosition: position must be 0-100");
+    }
+    const pp = Math.round(position * 2).toString(16).toUpperCase().padStart(2, "0");
+    const ww = Math.round(inclination + 127).toString(16).toUpperCase().padStart(2, "0");
+    const cmd = `R06${serialNumber.toUpperCase()}707003${pp}${ww}0000`;
+    return this.sendMoveCommand(cmd, timeoutMs);
+  }
+  async sendMoveCommand(rawCommand, timeoutMs) {
+    const session = this.radio.send(rawCommand, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    let result = null;
+    session.onResponse((content) => {
+      if (result) return;
+      const parsed = moveResponseMatcher(content);
+      if (parsed) {
+        result = parsed;
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: command rejected`);
+    }
+    if (ack.kind === "timeout") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: ack timeout`);
+    }
+    await session.promise;
+    if (!result) {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: no response from device`);
+    }
+    return result;
+  }
 };
 
-// ../lib/src/parsers/weather-station.ts
+// packages/lib/src/parsers/weather-station.ts
 function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
@@ -547,7 +605,7 @@ function weatherStationMatcher(frame) {
   };
 }
 
-// src/drivers/web-serial.ts
+// packages/web/src/drivers/web-serial.ts
 var WebSerialDriver = class {
   constructor(port) {
     this.port = port;
@@ -629,7 +687,7 @@ var WebSerialDriver = class {
   }
 };
 
-// src/browser.ts
+// packages/web/src/browser.ts
 function ts() {
   const d = /* @__PURE__ */ new Date();
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0");
@@ -693,7 +751,7 @@ async function startMonitor(port, params, onEvent) {
   return { commands };
 }
 
-// src/home.tsx
+// packages/web/src/home.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
 var NAMES_KEY = "wms-device-names";
 var HIDDEN_KEY = "wms-hidden-serials";
@@ -734,6 +792,8 @@ function App() {
   const [hiddenSerials, setHiddenSerials] = React.useState(loadHidden);
   const [wavingSerial, setWavingSerial] = React.useState("");
   const [waveMessages, setWaveMessages] = React.useState(/* @__PURE__ */ new Map());
+  const [movingSerial, setMovingSerial] = React.useState("");
+  const [moveMessages, setMoveMessages] = React.useState(/* @__PURE__ */ new Map());
   const handleConnect = async () => {
     try {
       const p = await navigator.serial.requestPort({
@@ -905,6 +965,30 @@ function App() {
     }
     setWavingSerial("");
   };
+  const handleMove = async (serial, position) => {
+    if (!commandsRef.current) return;
+    setMovingSerial(serial);
+    try {
+      if (position === -1) {
+        await commandsRef.current.stopDevice(serial);
+        setMoveMessages((prev) => new Map(prev).set(serial, "Stopped"));
+      } else {
+        await commandsRef.current.moveToPosition(serial, position);
+        const label = position === 100 ? "Up" : "Down";
+        setMoveMessages((prev) => new Map(prev).set(serial, `Moving ${label}...`));
+      }
+      const status2 = await commandsRef.current.getDeviceStatus(serial);
+      setDeviceStatuses((prev) => new Map(prev).set(serial, status2));
+      setStatusErrors((prev) => {
+        const next = new Map(prev);
+        next.delete(serial);
+        return next;
+      });
+    } catch (err) {
+      setMoveMessages((prev) => new Map(prev).set(serial, `Move failed: ${err.message}`));
+    }
+    setMovingSerial("");
+  };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
     status === "connect" && /* @__PURE__ */ jsx(
@@ -1041,6 +1125,41 @@ function App() {
               /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Moving" }),
               /* @__PURE__ */ jsx("span", { className: ds.moving ? "text-yellow-400 font-semibold" : "text-gray-500", children: ds.moving ? "Yes" : "No" })
             ] })
+          ] }),
+          (() => {
+            const mm = moveMessages.get(d.serialNumber);
+            if (!mm) return null;
+            const ok = !mm.startsWith("Move failed");
+            return /* @__PURE__ */ jsx("div", { className: `mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`, children: mm });
+          })(),
+          /* @__PURE__ */ jsxs("div", { className: "mt-3 pt-3 border-t border-gray-700 flex gap-2", children: [
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleMove(d.serialNumber, 100),
+                disabled: movingSerial === d.serialNumber,
+                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                children: "\u25B2 Up"
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleMove(d.serialNumber, 0),
+                disabled: movingSerial === d.serialNumber,
+                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                children: "\u25BC Down"
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleMove(d.serialNumber, -1),
+                disabled: movingSerial === d.serialNumber,
+                className: "flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-red-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                children: "\u25A0 Stop"
+              }
+            )
           ] })
         ] }, d.serialNumber);
       })

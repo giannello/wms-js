@@ -6,6 +6,8 @@ import { deviceStatusMatcher } from "../parsers/device-status.js"
 import type { DeviceStatus } from "../parsers/device-status.js"
 import { waveResponseMatcher } from "../parsers/wave-response.js"
 import { waveRequestMatcher } from "../parsers/wave-request.js"
+import { moveResponseMatcher } from "../parsers/move-response.js"
+import type { MoveResponse } from "../parsers/move-response.js"
 
 export interface NetworkParams {
   receiveBroadcasts: boolean
@@ -224,6 +226,70 @@ export class Commands {
 
     if (!result) {
       throw new Error("waveDevice: no response from device")
+    }
+
+    return result
+  }
+
+  async stopDevice(serialNumber: string, timeoutMs = 2000): Promise<MoveResponse> {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("stopDevice: invalid serial number")
+    }
+
+    const cmd = `R06${serialNumber.toUpperCase()}707001`
+    return this.sendMoveCommand(cmd, timeoutMs)
+  }
+
+  async moveToPosition(
+    serialNumber: string,
+    position: number,
+    inclination = 0,
+    timeoutMs = 2000,
+  ): Promise<MoveResponse> {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("moveToPosition: invalid serial number")
+    }
+    if (position < 0 || position > 100) {
+      throw new Error("moveToPosition: position must be 0-100")
+    }
+
+    const pp = Math.round(position * 2).toString(16).toUpperCase().padStart(2, "0")
+    const ww = Math.round(inclination + 127).toString(16).toUpperCase().padStart(2, "0")
+    const cmd = `R06${serialNumber.toUpperCase()}707003${pp}${ww}0000`
+
+    return this.sendMoveCommand(cmd, timeoutMs)
+  }
+
+  private async sendMoveCommand(rawCommand: string, timeoutMs: number): Promise<MoveResponse> {
+    const session = this.radio.send(rawCommand, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs,
+    })
+
+    let result: MoveResponse | null = null
+
+    session.onResponse((content) => {
+      if (result) return
+      const parsed = moveResponseMatcher(content)
+      if (parsed) {
+        result = parsed
+      }
+    })
+
+    const ack = await session.ack
+
+    if (ack.kind === "fail") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: command rejected`)
+    }
+
+    if (ack.kind === "timeout") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: ack timeout`)
+    }
+
+    await session.promise
+
+    if (!result) {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: no response from device`)
     }
 
     return result
