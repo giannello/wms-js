@@ -22,7 +22,7 @@ export function deviceStatusMatcher(frame: string): DeviceStatus | null {
     serialNumber: frame.slice(1, 7),
     deviceType,
     deviceTypeName: getDeviceTypeName(deviceType),
-    position: parseInt(frame.slice(19, 21), 16),
+    position: Math.round(parseInt(frame.slice(19, 21), 16) / 2),
     inclination: parseInt(frame.slice(21, 23), 16),
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),

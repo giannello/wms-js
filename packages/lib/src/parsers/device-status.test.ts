@@ -24,7 +24,7 @@ describe("deviceStatusMatcher", () => {
 
     expect(result).not.toBeNull()
     expect(result!.serialNumber).toBe("ABCDEF")
-    expect(result!.position).toBe(20)
+    expect(result!.position).toBe(10)
     expect(result!.moving).toBe(true)
   })
 
@@ -33,7 +33,16 @@ describe("deviceStatusMatcher", () => {
     const result = deviceStatusMatcher(frame)
 
     expect(result).not.toBeNull()
-    expect(result!.position).toBe(54)
+    expect(result!.position).toBe(27)
+    expect(result!.moving).toBe(false)
+  })
+
+  it("caps position at 100% when hex value exceeds 200", () => {
+    const frame = "rABCDEF801101000025C8FFFFFF00"
+    const result = deviceStatusMatcher(frame)
+
+    expect(result).not.toBeNull()
+    expect(result!.position).toBe(100)
     expect(result!.moving).toBe(false)
   })
 
