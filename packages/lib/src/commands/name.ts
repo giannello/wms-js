@@ -2,6 +2,8 @@ import { RadioController } from "../controller.js"
 import { ackMatch } from "../command/ack-match.js"
 import { deviceScanResponseMatcher } from "../parsers/device-scan-response.js"
 import type { DeviceScanResponse } from "../parsers/device-scan-response.js"
+import { deviceStatusMatcher } from "../parsers/device-status.js"
+import type { DeviceStatus } from "../parsers/device-status.js"
 
 export interface NetworkParams {
   receiveBroadcasts: boolean
@@ -110,7 +112,7 @@ export class Commands {
       throw new Error("scanNetwork: invalid PAN ID")
     }
 
-    const responses: DeviceScanResponse[] = []
+    const seen = new Map<string, DeviceScanResponse>()
     const frame = `R04FFFFFF7020${panId.toUpperCase()}02`
 
     const session = this.radio.send(frame, {
@@ -120,8 +122,8 @@ export class Commands {
 
     session.onResponse((content) => {
       const parsed = deviceScanResponseMatcher(content)
-      if (parsed) {
-        responses.push(parsed)
+      if (parsed && !seen.has(parsed.serialNumber)) {
+        seen.set(parsed.serialNumber, parsed)
       }
     })
 
@@ -137,6 +139,45 @@ export class Commands {
 
     await session.promise
 
-    return responses
+    return [...seen.values()]
+  }
+
+  async getDeviceStatus(serialNumber: string, timeoutMs = 2000): Promise<DeviceStatus> {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("getDeviceStatus: invalid serial number")
+    }
+
+    const frame = `R06${serialNumber.toUpperCase()}801001000005`
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs,
+    })
+
+    let result: DeviceStatus | null = null
+
+    session.onResponse((content) => {
+      const parsed = deviceStatusMatcher(content)
+      if (parsed && !result) {
+        result = parsed
+      }
+    })
+
+    const ack = await session.ack
+
+    if (ack.kind === "fail") {
+      throw new Error("getDeviceStatus: command rejected")
+    }
+
+    if (ack.kind === "timeout") {
+      throw new Error("getDeviceStatus: ack timeout")
+    }
+
+    await session.promise
+
+    if (!result) {
+      throw new Error("getDeviceStatus: no response from device")
+    }
+
+    return result
   }
 }

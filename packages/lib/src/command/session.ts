@@ -31,7 +31,10 @@ export class CommandSession {
       this.resolveDone = resolve
     })
     this.promise.then(() => this._onDone?.())
+  }
 
+  /** @internal called by RadioController when session becomes active */
+  _startAckTimer(): void {
     setTimeout(() => {
       if (this.cancelled || this.responseWindow) return
       this.resolveAck?.({ kind: "timeout" })

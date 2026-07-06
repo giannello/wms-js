@@ -12,6 +12,7 @@ describe("deviceScanResponseMatcher", () => {
     expect(result!.serialNumber).toBe("ABCDEF")
     expect(result!.panId).toBe("DEAD")
     expect(result!.deviceType).toBe("02")
+    expect(result!.deviceTypeName).toBe("Unknown")
     expect(result!.unknown).toBe(UNKNOWN)
     expect(result!.raw).toBe(frame)
   })
@@ -24,7 +25,17 @@ describe("deviceScanResponseMatcher", () => {
     expect(result!.serialNumber).toBe("987654")
     expect(result!.panId).toBe("0042")
     expect(result!.deviceType).toBe("03")
+    expect(result!.deviceTypeName).toBe("Unknown")
     expect(result!.unknown).toBe(UNKNOWN)
+  })
+
+  it("maps device type 25 to Awning", () => {
+    const frame = `rABCDEF7021DEAD25${UNKNOWN}`
+    const result = deviceScanResponseMatcher(frame)
+
+    expect(result).not.toBeNull()
+    expect(result!.deviceType).toBe("25")
+    expect(result!.deviceTypeName).toBe("Awning")
   })
 
   it("returns null if frame does not start with r", () => {

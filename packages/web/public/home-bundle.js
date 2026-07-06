@@ -115,6 +115,9 @@ var CommandSession = class {
       this.resolveDone = resolve;
     });
     this.promise.then(() => this._onDone?.());
+  }
+  /** @internal called by RadioController when session becomes active */
+  _startAckTimer() {
     setTimeout(() => {
       if (this.cancelled || this.responseWindow) return;
       this.resolveAck?.({ kind: "timeout" });
@@ -262,6 +265,7 @@ var RadioController = class {
     if (this.activeOp !== null || this.queue.length === 0) return;
     const op = this.queue.shift();
     this.activeOp = op;
+    op._startAckTimer();
     this.driver.write(serializeFrame(op.command));
   }
   onSerialData(data) {
@@ -299,15 +303,42 @@ var RadioController = class {
 };
 
 // ../lib/src/parsers/device-scan-response.ts
+var DEVICE_TYPE_NAMES = {
+  "25": "Awning"
+};
+function getDeviceTypeName(code) {
+  return DEVICE_TYPE_NAMES[code] ?? "Unknown";
+}
 function deviceScanResponseMatcher(frame) {
   if (frame.length < 57) return null;
   if (frame[0] !== "r") return null;
   if (frame.slice(7, 11) !== "7021") return null;
+  const deviceType = frame.slice(15, 17);
   return {
     serialNumber: frame.slice(1, 7),
     panId: frame.slice(11, 15),
-    deviceType: frame.slice(15, 17),
+    deviceType,
+    deviceTypeName: getDeviceTypeName(deviceType),
     unknown: frame.slice(17, 57),
+    raw: frame
+  };
+}
+
+// ../lib/src/parsers/device-status.ts
+function deviceStatusMatcher(frame) {
+  if (frame.length < 29) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "8011") return null;
+  const deviceType = frame.slice(17, 19);
+  return {
+    serialNumber: frame.slice(1, 7),
+    deviceType,
+    deviceTypeName: getDeviceTypeName(deviceType),
+    position: parseInt(frame.slice(19, 21), 16),
+    inclination: parseInt(frame.slice(21, 23), 16),
+    valance1: parseInt(frame.slice(23, 25), 16),
+    valance2: parseInt(frame.slice(25, 27), 16),
+    moving: frame.slice(27, 29) === "01",
     raw: frame
   };
 }
@@ -392,7 +423,7 @@ var Commands = class {
     if (!/^[0-9A-Fa-f]{4}$/.test(panId)) {
       throw new Error("scanNetwork: invalid PAN ID");
     }
-    const responses = [];
+    const seen = /* @__PURE__ */ new Map();
     const frame = `R04FFFFFF7020${panId.toUpperCase()}02`;
     const session = this.radio.send(frame, {
       ackMatcher: ackMatch.exact("a"),
@@ -400,8 +431,8 @@ var Commands = class {
     });
     session.onResponse((content) => {
       const parsed = deviceScanResponseMatcher(content);
-      if (parsed) {
-        responses.push(parsed);
+      if (parsed && !seen.has(parsed.serialNumber)) {
+        seen.set(parsed.serialNumber, parsed);
       }
     });
     const ack = await session.ack;
@@ -412,7 +443,36 @@ var Commands = class {
       throw new Error("scanNetwork: ack timeout");
     }
     await session.promise;
-    return responses;
+    return [...seen.values()];
+  }
+  async getDeviceStatus(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("getDeviceStatus: invalid serial number");
+    }
+    const frame = `R06${serialNumber.toUpperCase()}801001000005`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    let result = null;
+    session.onResponse((content) => {
+      const parsed = deviceStatusMatcher(content);
+      if (parsed && !result) {
+        result = parsed;
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("getDeviceStatus: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("getDeviceStatus: ack timeout");
+    }
+    await session.promise;
+    if (!result) {
+      throw new Error("getDeviceStatus: no response from device");
+    }
+    return result;
   }
 };
 
@@ -581,6 +641,11 @@ function App() {
   const [scanning, setScanning] = React.useState(false);
   const [scanDevices, setScanDevices] = React.useState([]);
   const [scanError, setScanError] = React.useState("");
+  const [deviceStatuses, setDeviceStatuses] = React.useState(/* @__PURE__ */ new Map());
+  const [statusErrors, setStatusErrors] = React.useState(/* @__PURE__ */ new Map());
+  const [queryingSerial, setQueryingSerial] = React.useState("");
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshSummary, setRefreshSummary] = React.useState("");
   const handleConnect = async () => {
     try {
       const p = await navigator.serial.requestPort({
@@ -633,6 +698,72 @@ function App() {
     }
     setScanning(false);
   };
+  const handleQueryStatus = async (serialNumber) => {
+    if (!commandsRef.current) return;
+    setQueryingSerial(serialNumber);
+    setStatusErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(serialNumber);
+      return next;
+    });
+    try {
+      const status2 = await commandsRef.current.getDeviceStatus(serialNumber);
+      setDeviceStatuses((prev) => {
+        const next = new Map(prev);
+        next.set(serialNumber, status2);
+        return next;
+      });
+    } catch (e) {
+      setStatusErrors((prev) => {
+        const next = new Map(prev);
+        next.set(serialNumber, e.message);
+        return next;
+      });
+    }
+    setQueryingSerial("");
+  };
+  const handleRefreshAll = async () => {
+    if (!commandsRef.current || scanDevices.length === 0) return;
+    setRefreshing(true);
+    setRefreshSummary("");
+    const results = await Promise.all(
+      scanDevices.map(async (d) => {
+        try {
+          const status2 = await commandsRef.current.getDeviceStatus(d.serialNumber);
+          return { serial: d.serialNumber, status: status2 };
+        } catch (err) {
+          return { serial: d.serialNumber, error: err.message };
+        }
+      })
+    );
+    let ok = 0;
+    let fail = 0;
+    const newStatuses = /* @__PURE__ */ new Map();
+    const newErrors = /* @__PURE__ */ new Map();
+    for (const r of results) {
+      if ("status" in r) {
+        ok++;
+        newStatuses.set(r.serial, r.status);
+      } else {
+        fail++;
+        newErrors.set(r.serial, r.error);
+      }
+    }
+    setRefreshSummary(
+      ok > 0 ? `Updated ${ok} device${ok > 1 ? "s" : ""}${fail > 0 ? ` (${fail} failed)` : ""}` : `No devices responded (${fail} failed)`
+    );
+    setDeviceStatuses((prev) => {
+      const next = new Map(prev);
+      for (const [k, v] of newStatuses) next.set(k, v);
+      return next;
+    });
+    setStatusErrors((prev) => {
+      const next = new Map(prev);
+      for (const [k, v] of newErrors) next.set(k, v);
+      return next;
+    });
+    setRefreshing(false);
+  };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
     status === "connect" && /* @__PURE__ */ jsx(
@@ -675,12 +806,53 @@ function App() {
         }
       ),
       scanError && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: scanError }),
-      scanDevices.map((d) => /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-violet-700 rounded-lg p-4", children: [
-        /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
-        /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: d.serialNumber }),
-        /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide mt-3", children: "Device Type" }),
-        /* @__PURE__ */ jsx("div", { className: "text-violet-400 font-bold text-2xl mt-1", children: d.deviceType })
-      ] }, d.serialNumber))
+      scanDevices.length > 0 && /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleRefreshAll,
+          disabled: refreshing,
+          className: "ml-2 px-6 py-3 bg-violet-700 hover:bg-violet-600 disabled:bg-violet-800 disabled:cursor-wait text-white rounded-lg font-semibold text-sm transition-colors",
+          children: refreshing ? "Refreshing..." : "Refresh All"
+        }
+      ),
+      refreshSummary && /* @__PURE__ */ jsx("div", { className: "text-sm text-gray-500", children: refreshSummary }),
+      scanDevices.map((d) => {
+        const ds = deviceStatuses.get(d.serialNumber);
+        const err = statusErrors.get(d.serialNumber);
+        return /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-violet-700 rounded-lg p-4", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between", children: [
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
+              /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: d.serialNumber }),
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide mt-3", children: "Device Type" }),
+              /* @__PURE__ */ jsx("div", { className: "text-violet-400 font-bold text-2xl mt-1", children: d.deviceTypeName })
+            ] }),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleQueryStatus(d.serialNumber),
+                disabled: queryingSerial === d.serialNumber,
+                className: "px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                children: queryingSerial === d.serialNumber ? "..." : "Status"
+              }
+            )
+          ] }),
+          err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-400", children: err }),
+          ds && /* @__PURE__ */ jsxs("div", { className: "mt-3 pt-3 border-t border-gray-700 space-y-1", children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex justify-between text-sm", children: [
+              /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Position" }),
+              /* @__PURE__ */ jsxs("span", { className: "text-violet-300 font-semibold", children: [
+                ds.position,
+                "%"
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { className: "flex justify-between text-sm", children: [
+              /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Moving" }),
+              /* @__PURE__ */ jsx("span", { className: ds.moving ? "text-yellow-400 font-semibold" : "text-gray-500", children: ds.moving ? "Yes" : "No" })
+            ] })
+          ] })
+        ] }, d.serialNumber);
+      })
     ] })
   ] });
 }

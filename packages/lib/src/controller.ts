@@ -83,6 +83,7 @@ export class RadioController {
 
     const op = this.queue.shift()!
     this.activeOp = op
+    op._startAckTimer()
     this.driver.write(serializeFrame(op.command))
   }
 

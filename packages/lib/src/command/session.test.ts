@@ -50,6 +50,7 @@ describe("CommandSession", () => {
 
   it("times out ack after timeout period", async () => {
     const session = new CommandSession("CMD", { ackMatcher: ackMatch.exact("a"), ackTimeoutMs: 100, responseWindowMs: 0 })
+    session._startAckTimer()
 
     vi.advanceTimersByTime(100)
 

@@ -16,10 +16,9 @@ const MIME: Record<string, string> = {
 }
 
 const server = http.createServer((req, res) => {
-  let filePath = path.join(
-    publicDir,
-    req.url!.split("?")[0],
-  )
+  let urlPath = req.url!.split("?")[0]
+  if (urlPath === "/") urlPath = "/index.html"
+  let filePath = path.join(publicDir, urlPath)
   filePath = path.normalize(filePath)
 
   if (!filePath.startsWith(publicDir)) {
