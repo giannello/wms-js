@@ -266,7 +266,9 @@ var RadioController = class {
     const op = this.queue.shift();
     this.activeOp = op;
     op._startAckTimer();
-    this.driver.write(serializeFrame(op.command));
+    const raw = serializeFrame(op.command);
+    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [>>] ${op.command}`);
+    this.driver.write(raw);
   }
   onSerialData(data) {
     const frames = this.parser.feed(data);
@@ -278,9 +280,11 @@ var RadioController = class {
     if (this.activeOp !== null) {
       const consumed = this.activeOp.feedFrame(frame);
       if (consumed) {
+        console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (session: ${this.activeOp.command})`);
         return;
       }
     }
+    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (broadcast)`);
     for (const handler of this.broadcastHandlers) {
       handler(frame);
     }
@@ -362,19 +366,6 @@ function waveRequestMatcher(frame) {
   if (frame.slice(7, 11) !== "7050") return null;
   return {
     serialNumber: frame.slice(1, 7),
-    raw: frame
-  };
-}
-
-// packages/lib/src/parsers/move-response.ts
-function moveResponseMatcher(frame) {
-  if (frame.length < 25) return null;
-  if (frame[0] !== "r") return null;
-  if (frame.slice(7, 11) !== "7071") return null;
-  return {
-    serialNumber: frame.slice(1, 7),
-    previousPosition: Math.round(parseInt(frame.slice(21, 23), 16) / 2),
-    previousInclination: parseInt(frame.slice(23, 25), 16) - 127,
     raw: frame
   };
 }
@@ -495,6 +486,7 @@ var Commands = class {
       const parsed = deviceStatusMatcher(content);
       if (parsed && !result) {
         result = parsed;
+        session.cancel();
       }
     });
     const ack = await session.ack;
@@ -526,11 +518,13 @@ var Commands = class {
       const wr = waveResponseMatcher(content);
       if (wr && wr.serialNumber === serial) {
         result = { serialNumber: wr.serialNumber, code: wr.code };
+        session.cancel();
         return;
       }
       const wr2 = waveRequestMatcher(content);
       if (wr2 && wr2.serialNumber === serial) {
         result = { serialNumber: wr2.serialNumber };
+        session.cancel();
       }
     });
     const ack = await session.ack;
@@ -568,15 +562,7 @@ var Commands = class {
   async sendMoveCommand(rawCommand, timeoutMs) {
     const session = this.radio.send(rawCommand, {
       ackMatcher: ackMatch.exact("a"),
-      responseWindowMs: timeoutMs
-    });
-    let result = null;
-    session.onResponse((content) => {
-      if (result) return;
-      const parsed = moveResponseMatcher(content);
-      if (parsed) {
-        result = parsed;
-      }
+      responseWindowMs: 0
     });
     const ack = await session.ack;
     if (ack.kind === "fail") {
@@ -585,11 +571,6 @@ var Commands = class {
     if (ack.kind === "timeout") {
       throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: ack timeout`);
     }
-    await session.promise;
-    if (!result) {
-      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: no response from device`);
-    }
-    return result;
   }
 };
 
@@ -719,7 +700,7 @@ async function startMonitor(port, params, onEvent) {
       message: `Failed to configure network: ${e.message}`
     });
     await radio.close();
-    return;
+    throw new Error("Failed to configure network");
   }
   try {
     await commands.setEncryptionKey(params.key);
@@ -731,7 +712,7 @@ async function startMonitor(port, params, onEvent) {
       message: `Failed to set encryption key: ${e.message}`
     });
     await radio.close();
-    return;
+    throw new Error("Failed to set encryption key");
   }
   onEvent({ type: "connected", timestamp: ts() });
   radio.onBroadcast((frame) => {
@@ -792,7 +773,6 @@ function App() {
   const [hiddenSerials, setHiddenSerials] = React.useState(loadHidden);
   const [wavingSerial, setWavingSerial] = React.useState("");
   const [waveMessages, setWaveMessages] = React.useState(/* @__PURE__ */ new Map());
-  const [movingSerial, setMovingSerial] = React.useState("");
   const [moveMessages, setMoveMessages] = React.useState(/* @__PURE__ */ new Map());
   const handleConnect = async () => {
     try {
@@ -895,7 +875,7 @@ function App() {
     for (const r of results) {
       if ("status" in r) {
         ok++;
-        newStatuses.set(r.serial, r.status);
+        if (r.status) newStatuses.set(r.serial, r.status);
       } else {
         fail++;
         newErrors.set(r.serial, r.error);
@@ -965,29 +945,29 @@ function App() {
     }
     setWavingSerial("");
   };
-  const handleMove = async (serial, position) => {
+  const handleMove = async (serial, direction) => {
     if (!commandsRef.current) return;
-    setMovingSerial(serial);
     try {
-      if (position === -1) {
+      if (direction === "stop") {
         await commandsRef.current.stopDevice(serial);
         setMoveMessages((prev) => new Map(prev).set(serial, "Stopped"));
       } else {
+        const position = direction === "up" ? 0 : 100;
         await commandsRef.current.moveToPosition(serial, position);
-        const label = position === 100 ? "Up" : "Down";
-        setMoveMessages((prev) => new Map(prev).set(serial, `Moving ${label}...`));
+        setMoveMessages((prev) => new Map(prev).set(serial, `Moving ${direction}...`));
       }
-      const status2 = await commandsRef.current.getDeviceStatus(serial);
-      setDeviceStatuses((prev) => new Map(prev).set(serial, status2));
-      setStatusErrors((prev) => {
-        const next = new Map(prev);
-        next.delete(serial);
-        return next;
+      commandsRef.current.getDeviceStatus(serial).then((status2) => {
+        setDeviceStatuses((prev) => new Map(prev).set(serial, status2));
+        setStatusErrors((prev) => {
+          const next = new Map(prev);
+          next.delete(serial);
+          return next;
+        });
+      }).catch(() => {
       });
     } catch (err) {
       setMoveMessages((prev) => new Map(prev).set(serial, `Move failed: ${err.message}`));
     }
-    setMovingSerial("");
   };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
@@ -1136,27 +1116,24 @@ function App() {
             /* @__PURE__ */ jsx(
               "button",
               {
-                onClick: () => handleMove(d.serialNumber, 100),
-                disabled: movingSerial === d.serialNumber,
-                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                onClick: () => handleMove(d.serialNumber, "up"),
+                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors",
                 children: "\u25B2 Up"
               }
             ),
             /* @__PURE__ */ jsx(
               "button",
               {
-                onClick: () => handleMove(d.serialNumber, 0),
-                disabled: movingSerial === d.serialNumber,
-                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                onClick: () => handleMove(d.serialNumber, "down"),
+                className: "flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors",
                 children: "\u25BC Down"
               }
             ),
             /* @__PURE__ */ jsx(
               "button",
               {
-                onClick: () => handleMove(d.serialNumber, -1),
-                disabled: movingSerial === d.serialNumber,
-                className: "flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 disabled:bg-red-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                onClick: () => handleMove(d.serialNumber, "stop"),
+                className: "flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded text-xs font-semibold transition-colors",
                 children: "\u25A0 Stop"
               }
             )

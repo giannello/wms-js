@@ -84,7 +84,9 @@ export class RadioController {
     const op = this.queue.shift()!
     this.activeOp = op
     op._startAckTimer()
-    this.driver.write(serializeFrame(op.command))
+    const raw = serializeFrame(op.command)
+    console.error(`[${new Date().toISOString()}] [>>] ${op.command}`)
+    this.driver.write(raw)
   }
 
   private onSerialData(data: Uint8Array): void {
@@ -98,10 +100,12 @@ export class RadioController {
     if (this.activeOp !== null) {
       const consumed = this.activeOp.feedFrame(frame)
       if (consumed) {
+        console.error(`[${new Date().toISOString()}] [<<] ${frame}  (session: ${this.activeOp.command})`)
         return
       }
     }
 
+    console.error(`[${new Date().toISOString()}] [<<] ${frame}  (broadcast)`)
     for (const handler of this.broadcastHandlers) {
       handler(frame)
     }

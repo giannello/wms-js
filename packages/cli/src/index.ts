@@ -20,7 +20,10 @@ Options:
   --discover          Listen for a remote pairing broadcast to detect and switch to
                       the remote's network (ignores --channel, --pan-id, --key)
   --wave <serial>     6-char serial number — send a wave request to a device, print
-                      the response code, then exit
+                       the response code, then exit
+  --stop <serial>     6-char serial number — send a stop command to the device, then exit
+  --move <serial> <position>
+                       Send a move-to-position command (position 0-100), then exit
   --help              Show this help
 `)
   process.exit(1)
@@ -33,6 +36,8 @@ function parseArgs(): {
   key: string | undefined
   discover: boolean
   wave: string | undefined
+  stop: string | undefined
+  move: { serial: string; position: number } | undefined
 } {
   const args = process.argv.slice(2)
   if (args.length === 0 || args.includes("--help")) usage()
@@ -43,6 +48,8 @@ function parseArgs(): {
   let key: string | undefined
   let discover = false
   let wave: string | undefined
+  let stop: string | undefined
+  let move: { serial: string; position: number } | undefined
   let channelSet = false
   let panIdSet = false
 
@@ -67,6 +74,12 @@ function parseArgs(): {
         break
       case "--wave":
         wave = args[++i] ?? ""
+        break
+      case "--stop":
+        stop = args[++i] ?? ""
+        break
+      case "--move":
+        move = { serial: args[++i] ?? "", position: Number(args[++i]) }
         break
       default:
         console.error(`Unknown option: ${args[i]}`)
@@ -96,6 +109,22 @@ function parseArgs(): {
     usage()
   }
 
+  if (stop !== undefined && !/^[0-9A-Fa-f]{6}$/.test(stop)) {
+    console.error("Error: --stop must be a 6-character hex serial number")
+    usage()
+  }
+
+  if (move !== undefined) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(move.serial)) {
+      console.error("Error: --move serial must be a 6-character hex serial number")
+      usage()
+    }
+    if (move.position < 0 || move.position > 100) {
+      console.error("Error: --move position must be 0-100")
+      usage()
+    }
+  }
+
   if (key !== undefined && !/^[0-9A-Fa-f]{32}$/.test(key)) {
     console.error("Error: --key must be a 32-character hex string")
     usage()
@@ -116,11 +145,11 @@ function parseArgs(): {
     usage()
   }
 
-  return { port, channel, panId: panId.toUpperCase(), key, discover, wave }
+  return { port, channel, panId: panId.toUpperCase(), key, discover, wave, stop, move }
 }
 
 async function main(): Promise<void> {
-  const { port, channel, panId, key, discover, wave } = parseArgs()
+  const { port, channel, panId, key, discover, wave, stop, move } = parseArgs()
 
   const driver = new NodeSerialDriver()
   const radio = new RadioController(driver)
@@ -189,6 +218,28 @@ async function main(): Promise<void> {
       const result = await commands.waveDevice(wave)
       const code = result.code ? `  code=${result.code}` : ""
       console.log(`${timestamp()} [WAV] ${result.serialNumber} wave ack${code}`)
+    } catch (e) {
+      console.error(`${timestamp()} [ERR] ${(e as Error).message}`)
+    }
+    await radio.close()
+    process.exit(0)
+  }
+
+  if (stop) {
+    try {
+      await commands.stopDevice(stop)
+      console.log(`${timestamp()} [MOV] ${stop} stopped`)
+    } catch (e) {
+      console.error(`${timestamp()} [ERR] ${(e as Error).message}`)
+    }
+    await radio.close()
+    process.exit(0)
+  }
+
+  if (move) {
+    try {
+      await commands.moveToPosition(move.serial, move.position)
+      console.log(`${timestamp()} [MOV] ${move.serial} moved to ${move.position}%`)
     } catch (e) {
       console.error(`${timestamp()} [ERR] ${(e as Error).message}`)
     }

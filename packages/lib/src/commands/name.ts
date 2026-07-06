@@ -6,8 +6,6 @@ import { deviceStatusMatcher } from "../parsers/device-status.js"
 import type { DeviceStatus } from "../parsers/device-status.js"
 import { waveResponseMatcher } from "../parsers/wave-response.js"
 import { waveRequestMatcher } from "../parsers/wave-request.js"
-import { moveResponseMatcher } from "../parsers/move-response.js"
-import type { MoveResponse } from "../parsers/move-response.js"
 
 export interface NetworkParams {
   receiveBroadcasts: boolean
@@ -163,6 +161,7 @@ export class Commands {
       const parsed = deviceStatusMatcher(content)
       if (parsed && !result) {
         result = parsed
+        session.cancel()
       }
     })
 
@@ -204,11 +203,13 @@ export class Commands {
       const wr = waveResponseMatcher(content)
       if (wr && wr.serialNumber === serial) {
         result = { serialNumber: wr.serialNumber, code: wr.code }
+        session.cancel()
         return
       }
       const wr2 = waveRequestMatcher(content)
       if (wr2 && wr2.serialNumber === serial) {
         result = { serialNumber: wr2.serialNumber }
+        session.cancel()
       }
     })
 
@@ -231,7 +232,7 @@ export class Commands {
     return result
   }
 
-  async stopDevice(serialNumber: string, timeoutMs = 2000): Promise<MoveResponse> {
+  async stopDevice(serialNumber: string, timeoutMs = 2000): Promise<void> {
     if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
       throw new Error("stopDevice: invalid serial number")
     }
@@ -245,7 +246,7 @@ export class Commands {
     position: number,
     inclination = 0,
     timeoutMs = 2000,
-  ): Promise<MoveResponse> {
+  ): Promise<void> {
     if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
       throw new Error("moveToPosition: invalid serial number")
     }
@@ -260,20 +261,10 @@ export class Commands {
     return this.sendMoveCommand(cmd, timeoutMs)
   }
 
-  private async sendMoveCommand(rawCommand: string, timeoutMs: number): Promise<MoveResponse> {
+  private async sendMoveCommand(rawCommand: string, timeoutMs: number): Promise<void> {
     const session = this.radio.send(rawCommand, {
       ackMatcher: ackMatch.exact("a"),
-      responseWindowMs: timeoutMs,
-    })
-
-    let result: MoveResponse | null = null
-
-    session.onResponse((content) => {
-      if (result) return
-      const parsed = moveResponseMatcher(content)
-      if (parsed) {
-        result = parsed
-      }
+      responseWindowMs: 0,
     })
 
     const ack = await session.ack
@@ -285,13 +276,5 @@ export class Commands {
     if (ack.kind === "timeout") {
       throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: ack timeout`)
     }
-
-    await session.promise
-
-    if (!result) {
-      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: no response from device`)
-    }
-
-    return result
   }
 }
