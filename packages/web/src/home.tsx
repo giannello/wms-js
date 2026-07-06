@@ -5,6 +5,33 @@ import type { DeviceScanResponse, DeviceStatus } from "@warema/lib"
 
 type StationData = { serialNumber: string; windSpeed: number }
 
+const NAMES_KEY = "wms-device-names"
+const HIDDEN_KEY = "wms-hidden-serials"
+
+function loadNames(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(NAMES_KEY) || "{}")
+  } catch {
+    return {}
+  }
+}
+
+function saveNames(names: Record<string, string>) {
+  localStorage.setItem(NAMES_KEY, JSON.stringify(names))
+}
+
+function loadHidden(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"))
+  } catch {
+    return new Set()
+  }
+}
+
+function saveHidden(hidden: Set<string>) {
+  localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]))
+}
+
 function App() {
   const [stations, setStations] = React.useState<Map<string, StationData>>(new Map())
   const [status, setStatus] = React.useState<"connect" | "connecting" | "monitoring" | "error">("connect")
@@ -21,6 +48,8 @@ function App() {
   const [queryingSerial, setQueryingSerial] = React.useState("")
   const [refreshing, setRefreshing] = React.useState(false)
   const [refreshSummary, setRefreshSummary] = React.useState("")
+  const [deviceNames, setDeviceNames] = React.useState<Record<string, string>>(loadNames)
+  const [hiddenSerials, setHiddenSerials] = React.useState<Set<string>>(loadHidden)
 
   const handleConnect = async () => {
     try {
@@ -73,7 +102,11 @@ function App() {
     setScanError("")
     try {
       const results = await commandsRef.current.scanNetwork(params.panId)
-      setScanDevices(results)
+      setScanDevices((prev) => {
+        const map = new Map(prev.map((d) => [d.serialNumber, d]))
+        for (const d of results) map.set(d.serialNumber, d)
+        return [...map.values()]
+      })
     } catch (e) {
       setScanError((e as Error).message)
     }
@@ -150,6 +183,40 @@ function App() {
     setRefreshing(false)
   }
 
+  const handleDeleteDevice = (serial: string) => {
+    setScanDevices((prev) => prev.filter((d) => d.serialNumber !== serial))
+    setDeviceStatuses((prev) => {
+      const next = new Map(prev)
+      next.delete(serial)
+      return next
+    })
+    setStatusErrors((prev) => {
+      const next = new Map(prev)
+      next.delete(serial)
+      return next
+    })
+    setDeviceNames((prev) => {
+      const next = { ...prev }
+      delete next[serial]
+      saveNames(next)
+      return next
+    })
+    setHiddenSerials((prev) => {
+      const next = new Set(prev)
+      next.add(serial)
+      saveHidden(next)
+      return next
+    })
+  }
+
+  const handleNameChange = (serial: string, name: string) => {
+    setDeviceNames((prev) => {
+      const next = { ...prev, [serial]: name }
+      saveNames(next)
+      return next
+    })
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <h1 className="text-2xl font-bold text-emerald-400">WMS Network Monitor</h1>
@@ -218,25 +285,51 @@ function App() {
             <div className="text-sm text-gray-500">{refreshSummary}</div>
           )}
 
-          {scanDevices.map((d) => {
+          {hiddenSerials.size > 0 && (
+            <button
+              onClick={() => {
+                setHiddenSerials(new Set())
+                localStorage.removeItem(HIDDEN_KEY)
+              }}
+              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              Restore {hiddenSerials.size} hidden device{hiddenSerials.size > 1 ? "s" : ""}
+            </button>
+          )}
+
+          {scanDevices.filter((d) => !hiddenSerials.has(d.serialNumber)).map((d) => {
             const ds = deviceStatuses.get(d.serialNumber)
             const err = statusErrors.get(d.serialNumber)
+            const name = deviceNames[d.serialNumber] || ""
             return (
               <div key={d.serialNumber} className="bg-gray-900 border border-violet-700 rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-gray-400 text-xs uppercase tracking-wide">Serial</div>
-                    <div className="text-white font-semibold mt-1">{d.serialNumber}</div>
-                    <div className="text-gray-400 text-xs uppercase tracking-wide mt-3">Device Type</div>
-                    <div className="text-violet-400 font-bold text-2xl mt-1">{d.deviceTypeName}</div>
-                  </div>
+                <div className="flex items-start justify-between gap-2">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => handleNameChange(d.serialNumber, e.target.value)}
+                    placeholder="Name this device"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                  />
                   <button
                     onClick={() => handleQueryStatus(d.serialNumber)}
                     disabled={queryingSerial === d.serialNumber}
-                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors"
+                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors shrink-0"
                   >
                     {queryingSerial === d.serialNumber ? "..." : "Status"}
                   </button>
+                  <button
+                    onClick={() => handleDeleteDevice(d.serialNumber)}
+                    className="px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0"
+                    title="Remove device"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                  <span>{d.serialNumber}</span>
+                  <span>·</span>
+                  <span className="text-violet-400 font-semibold">{d.deviceTypeName}</span>
                 </div>
                 {err && (
                   <div className="mt-2 text-xs text-red-400">{err}</div>

@@ -633,6 +633,28 @@ async function startMonitor(port, params, onEvent) {
 
 // src/home.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
+var NAMES_KEY = "wms-device-names";
+var HIDDEN_KEY = "wms-hidden-serials";
+function loadNames() {
+  try {
+    return JSON.parse(localStorage.getItem(NAMES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function saveNames(names) {
+  localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+}
+function loadHidden() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+  } catch {
+    return /* @__PURE__ */ new Set();
+  }
+}
+function saveHidden(hidden) {
+  localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
+}
 function App() {
   const [stations, setStations] = React.useState(/* @__PURE__ */ new Map());
   const [status, setStatus] = React.useState("connect");
@@ -646,6 +668,8 @@ function App() {
   const [queryingSerial, setQueryingSerial] = React.useState("");
   const [refreshing, setRefreshing] = React.useState(false);
   const [refreshSummary, setRefreshSummary] = React.useState("");
+  const [deviceNames, setDeviceNames] = React.useState(loadNames);
+  const [hiddenSerials, setHiddenSerials] = React.useState(loadHidden);
   const handleConnect = async () => {
     try {
       const p = await navigator.serial.requestPort({
@@ -692,7 +716,11 @@ function App() {
     setScanError("");
     try {
       const results = await commandsRef.current.scanNetwork(params.panId);
-      setScanDevices(results);
+      setScanDevices((prev) => {
+        const map = new Map(prev.map((d) => [d.serialNumber, d]));
+        for (const d of results) map.set(d.serialNumber, d);
+        return [...map.values()];
+      });
     } catch (e) {
       setScanError(e.message);
     }
@@ -764,6 +792,38 @@ function App() {
     });
     setRefreshing(false);
   };
+  const handleDeleteDevice = (serial) => {
+    setScanDevices((prev) => prev.filter((d) => d.serialNumber !== serial));
+    setDeviceStatuses((prev) => {
+      const next = new Map(prev);
+      next.delete(serial);
+      return next;
+    });
+    setStatusErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(serial);
+      return next;
+    });
+    setDeviceNames((prev) => {
+      const next = { ...prev };
+      delete next[serial];
+      saveNames(next);
+      return next;
+    });
+    setHiddenSerials((prev) => {
+      const next = new Set(prev);
+      next.add(serial);
+      saveHidden(next);
+      return next;
+    });
+  };
+  const handleNameChange = (serial, name) => {
+    setDeviceNames((prev) => {
+      const next = { ...prev, [serial]: name };
+      saveNames(next);
+      return next;
+    });
+  };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
     status === "connect" && /* @__PURE__ */ jsx(
@@ -816,26 +876,61 @@ function App() {
         }
       ),
       refreshSummary && /* @__PURE__ */ jsx("div", { className: "text-sm text-gray-500", children: refreshSummary }),
-      scanDevices.map((d) => {
+      hiddenSerials.size > 0 && /* @__PURE__ */ jsxs(
+        "button",
+        {
+          onClick: () => {
+            setHiddenSerials(/* @__PURE__ */ new Set());
+            localStorage.removeItem(HIDDEN_KEY);
+          },
+          className: "text-xs text-gray-600 hover:text-gray-400 transition-colors",
+          children: [
+            "Restore ",
+            hiddenSerials.size,
+            " hidden device",
+            hiddenSerials.size > 1 ? "s" : ""
+          ]
+        }
+      ),
+      scanDevices.filter((d) => !hiddenSerials.has(d.serialNumber)).map((d) => {
         const ds = deviceStatuses.get(d.serialNumber);
         const err = statusErrors.get(d.serialNumber);
+        const name = deviceNames[d.serialNumber] || "";
         return /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-violet-700 rounded-lg p-4", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between", children: [
-            /* @__PURE__ */ jsxs("div", { children: [
-              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
-              /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: d.serialNumber }),
-              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide mt-3", children: "Device Type" }),
-              /* @__PURE__ */ jsx("div", { className: "text-violet-400 font-bold text-2xl mt-1", children: d.deviceTypeName })
-            ] }),
+          /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-2", children: [
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                type: "text",
+                value: name,
+                onChange: (e) => handleNameChange(d.serialNumber, e.target.value),
+                placeholder: "Name this device",
+                className: "flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
+              }
+            ),
             /* @__PURE__ */ jsx(
               "button",
               {
                 onClick: () => handleQueryStatus(d.serialNumber),
                 disabled: queryingSerial === d.serialNumber,
-                className: "px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors",
+                className: "px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors shrink-0",
                 children: queryingSerial === d.serialNumber ? "..." : "Status"
               }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleDeleteDevice(d.serialNumber),
+                className: "px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0",
+                title: "Remove device",
+                children: "\xD7"
+              }
             )
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "mt-2 flex items-center gap-2 text-xs text-gray-500", children: [
+            /* @__PURE__ */ jsx("span", { children: d.serialNumber }),
+            /* @__PURE__ */ jsx("span", { children: "\xB7" }),
+            /* @__PURE__ */ jsx("span", { className: "text-violet-400 font-semibold", children: d.deviceTypeName })
           ] }),
           err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-400", children: err }),
           ds && /* @__PURE__ */ jsxs("div", { className: "mt-3 pt-3 border-t border-gray-700 space-y-1", children: [
