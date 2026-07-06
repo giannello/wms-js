@@ -19,6 +19,8 @@ Options:
   --key <hex>         32-char hex encryption key (optional, for encrypted networks)
   --discover          Listen for a remote pairing broadcast to detect and switch to
                       the remote's network (ignores --channel, --pan-id, --key)
+  --wave <serial>     6-char serial number — send a wave request to a device, print
+                      the response code, then exit
   --help              Show this help
 `)
   process.exit(1)
@@ -30,6 +32,7 @@ function parseArgs(): {
   panId: string
   key: string | undefined
   discover: boolean
+  wave: string | undefined
 } {
   const args = process.argv.slice(2)
   if (args.length === 0 || args.includes("--help")) usage()
@@ -39,6 +42,7 @@ function parseArgs(): {
   let panId = "FFFF"
   let key: string | undefined
   let discover = false
+  let wave: string | undefined
   let channelSet = false
   let panIdSet = false
 
@@ -60,6 +64,9 @@ function parseArgs(): {
         break
       case "--discover":
         discover = true
+        break
+      case "--wave":
+        wave = args[++i] ?? ""
         break
       default:
         console.error(`Unknown option: ${args[i]}`)
@@ -84,6 +91,11 @@ function parseArgs(): {
     usage()
   }
 
+  if (wave !== undefined && !/^[0-9A-Fa-f]{6}$/.test(wave)) {
+    console.error("Error: --wave must be a 6-character hex serial number")
+    usage()
+  }
+
   if (key !== undefined && !/^[0-9A-Fa-f]{32}$/.test(key)) {
     console.error("Error: --key must be a 32-character hex string")
     usage()
@@ -104,11 +116,11 @@ function parseArgs(): {
     usage()
   }
 
-  return { port, channel, panId: panId.toUpperCase(), key, discover }
+  return { port, channel, panId: panId.toUpperCase(), key, discover, wave }
 }
 
 async function main(): Promise<void> {
-  const { port, channel, panId, key, discover } = parseArgs()
+  const { port, channel, panId, key, discover, wave } = parseArgs()
 
   const driver = new NodeSerialDriver()
   const radio = new RadioController(driver)
@@ -170,6 +182,18 @@ async function main(): Promise<void> {
       await radio.close()
       process.exit(1)
     }
+  }
+
+  if (wave) {
+    try {
+      const result = await commands.waveDevice(wave)
+      const code = result.code ? `  code=${result.code}` : ""
+      console.log(`${timestamp()} [WAV] ${result.serialNumber} wave ack${code}`)
+    } catch (e) {
+      console.error(`${timestamp()} [ERR] ${(e as Error).message}`)
+    }
+    await radio.close()
+    process.exit(0)
   }
 
   radio.onBroadcast(async (frame) => {

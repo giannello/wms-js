@@ -39,6 +39,7 @@ function App() {
   const commandsRef = React.useRef<{
     scanNetwork: (panId: string) => Promise<DeviceScanResponse[]>
     getDeviceStatus: (serialNumber: string) => Promise<DeviceStatus>
+    waveDevice: (serialNumber: string) => Promise<{ serialNumber: string; code?: string }>
   } | null>(null)
   const [scanning, setScanning] = React.useState(false)
   const [scanDevices, setScanDevices] = React.useState<DeviceScanResponse[]>([])
@@ -50,6 +51,8 @@ function App() {
   const [refreshSummary, setRefreshSummary] = React.useState("")
   const [deviceNames, setDeviceNames] = React.useState<Record<string, string>>(loadNames)
   const [hiddenSerials, setHiddenSerials] = React.useState<Set<string>>(loadHidden)
+  const [wavingSerial, setWavingSerial] = React.useState("")
+  const [waveMessages, setWaveMessages] = React.useState<Map<string, string>>(new Map())
 
   const handleConnect = async () => {
     try {
@@ -217,6 +220,24 @@ function App() {
     })
   }
 
+  const handleWaveDevice = async (serial: string) => {
+    if (!commandsRef.current) return
+    setWavingSerial(serial)
+    setWaveMessages((prev) => {
+      const next = new Map(prev)
+      next.delete(serial)
+      return next
+    })
+    try {
+      const result = await commandsRef.current.waveDevice(serial)
+      const msg = result.code ? `Waved! code=${result.code}` : "Waved!"
+      setWaveMessages((prev) => new Map(prev).set(serial, msg))
+    } catch (err) {
+      setWaveMessages((prev) => new Map(prev).set(serial, `Wave failed: ${(err as Error).message}`))
+    }
+    setWavingSerial("")
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <h1 className="text-2xl font-bold text-emerald-400">WMS Network Monitor</h1>
@@ -319,6 +340,13 @@ function App() {
                     {queryingSerial === d.serialNumber ? "..." : "Status"}
                   </button>
                   <button
+                    onClick={() => handleWaveDevice(d.serialNumber)}
+                    disabled={wavingSerial === d.serialNumber}
+                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors shrink-0"
+                  >
+                    {wavingSerial === d.serialNumber ? "..." : "Wave"}
+                  </button>
+                  <button
                     onClick={() => handleDeleteDevice(d.serialNumber)}
                     className="px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0"
                     title="Remove device"
@@ -334,6 +362,16 @@ function App() {
                 {err && (
                   <div className="mt-2 text-xs text-red-400">{err}</div>
                 )}
+                {(() => {
+                  const wm = waveMessages.get(d.serialNumber)
+                  if (!wm) return null
+                  const ok = !wm.startsWith("Wave failed")
+                  return (
+                    <div className={`mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`}>
+                      {wm}
+                    </div>
+                  )
+                })()}
                 {ds && (
                   <div className="mt-3 pt-3 border-t border-gray-700 space-y-1">
                     <div className="flex justify-between text-sm">

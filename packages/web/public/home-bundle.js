@@ -334,11 +334,34 @@ function deviceStatusMatcher(frame) {
     serialNumber: frame.slice(1, 7),
     deviceType,
     deviceTypeName: getDeviceTypeName(deviceType),
-    position: parseInt(frame.slice(19, 21), 16),
+    position: Math.round(parseInt(frame.slice(19, 21), 16) / 2),
     inclination: parseInt(frame.slice(21, 23), 16),
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",
+    raw: frame
+  };
+}
+
+// ../lib/src/parsers/wave-response.ts
+function waveResponseMatcher(frame) {
+  if (frame.length < 15) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "50AC") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
+    code: frame.slice(11, 15),
+    raw: frame
+  };
+}
+
+// ../lib/src/parsers/wave-request.ts
+function waveRequestMatcher(frame) {
+  if (frame.length < 11) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "7050") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
     raw: frame
   };
 }
@@ -471,6 +494,42 @@ var Commands = class {
     await session.promise;
     if (!result) {
       throw new Error("getDeviceStatus: no response from device");
+    }
+    return result;
+  }
+  async waveDevice(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("waveDevice: invalid serial number");
+    }
+    const serial = serialNumber.toUpperCase();
+    const frame = `R06${serial}7050`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    let result = null;
+    session.onResponse((content) => {
+      if (result) return;
+      const wr = waveResponseMatcher(content);
+      if (wr && wr.serialNumber === serial) {
+        result = { serialNumber: wr.serialNumber, code: wr.code };
+        return;
+      }
+      const wr2 = waveRequestMatcher(content);
+      if (wr2 && wr2.serialNumber === serial) {
+        result = { serialNumber: wr2.serialNumber };
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("waveDevice: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("waveDevice: ack timeout");
+    }
+    await session.promise;
+    if (!result) {
+      throw new Error("waveDevice: no response from device");
     }
     return result;
   }
@@ -670,6 +729,8 @@ function App() {
   const [refreshSummary, setRefreshSummary] = React.useState("");
   const [deviceNames, setDeviceNames] = React.useState(loadNames);
   const [hiddenSerials, setHiddenSerials] = React.useState(loadHidden);
+  const [wavingSerial, setWavingSerial] = React.useState("");
+  const [waveMessages, setWaveMessages] = React.useState(/* @__PURE__ */ new Map());
   const handleConnect = async () => {
     try {
       const p = await navigator.serial.requestPort({
@@ -824,6 +885,23 @@ function App() {
       return next;
     });
   };
+  const handleWaveDevice = async (serial) => {
+    if (!commandsRef.current) return;
+    setWavingSerial(serial);
+    setWaveMessages((prev) => {
+      const next = new Map(prev);
+      next.delete(serial);
+      return next;
+    });
+    try {
+      const result = await commandsRef.current.waveDevice(serial);
+      const msg = result.code ? `Waved! code=${result.code}` : "Waved!";
+      setWaveMessages((prev) => new Map(prev).set(serial, msg));
+    } catch (err) {
+      setWaveMessages((prev) => new Map(prev).set(serial, `Wave failed: ${err.message}`));
+    }
+    setWavingSerial("");
+  };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
     status === "connect" && /* @__PURE__ */ jsx(
@@ -920,6 +998,15 @@ function App() {
             /* @__PURE__ */ jsx(
               "button",
               {
+                onClick: () => handleWaveDevice(d.serialNumber),
+                disabled: wavingSerial === d.serialNumber,
+                className: "px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-800 disabled:cursor-wait text-white rounded text-xs font-semibold transition-colors shrink-0",
+                children: wavingSerial === d.serialNumber ? "..." : "Wave"
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
                 onClick: () => handleDeleteDevice(d.serialNumber),
                 className: "px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0",
                 title: "Remove device",
@@ -933,6 +1020,12 @@ function App() {
             /* @__PURE__ */ jsx("span", { className: "text-violet-400 font-semibold", children: d.deviceTypeName })
           ] }),
           err && /* @__PURE__ */ jsx("div", { className: "mt-2 text-xs text-red-400", children: err }),
+          (() => {
+            const wm = waveMessages.get(d.serialNumber);
+            if (!wm) return null;
+            const ok = !wm.startsWith("Wave failed");
+            return /* @__PURE__ */ jsx("div", { className: `mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`, children: wm });
+          })(),
           ds && /* @__PURE__ */ jsxs("div", { className: "mt-3 pt-3 border-t border-gray-700 space-y-1", children: [
             /* @__PURE__ */ jsxs("div", { className: "flex justify-between text-sm", children: [
               /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Position" }),

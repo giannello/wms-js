@@ -4,6 +4,8 @@ import { deviceScanResponseMatcher } from "../parsers/device-scan-response.js"
 import type { DeviceScanResponse } from "../parsers/device-scan-response.js"
 import { deviceStatusMatcher } from "../parsers/device-status.js"
 import type { DeviceStatus } from "../parsers/device-status.js"
+import { waveResponseMatcher } from "../parsers/wave-response.js"
+import { waveRequestMatcher } from "../parsers/wave-request.js"
 
 export interface NetworkParams {
   receiveBroadcasts: boolean
@@ -176,6 +178,52 @@ export class Commands {
 
     if (!result) {
       throw new Error("getDeviceStatus: no response from device")
+    }
+
+    return result
+  }
+
+  async waveDevice(serialNumber: string, timeoutMs = 2000): Promise<{ serialNumber: string; code?: string }> {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("waveDevice: invalid serial number")
+    }
+
+    const serial = serialNumber.toUpperCase()
+    const frame = `R06${serial}7050`
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs,
+    })
+
+    let result: { serialNumber: string; code?: string } | null = null
+
+    session.onResponse((content) => {
+      if (result) return
+      const wr = waveResponseMatcher(content)
+      if (wr && wr.serialNumber === serial) {
+        result = { serialNumber: wr.serialNumber, code: wr.code }
+        return
+      }
+      const wr2 = waveRequestMatcher(content)
+      if (wr2 && wr2.serialNumber === serial) {
+        result = { serialNumber: wr2.serialNumber }
+      }
+    })
+
+    const ack = await session.ack
+
+    if (ack.kind === "fail") {
+      throw new Error("waveDevice: command rejected")
+    }
+
+    if (ack.kind === "timeout") {
+      throw new Error("waveDevice: ack timeout")
+    }
+
+    await session.promise
+
+    if (!result) {
+      throw new Error("waveDevice: no response from device")
     }
 
     return result
