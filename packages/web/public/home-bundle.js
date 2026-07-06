@@ -687,6 +687,9 @@ async function startMonitor(port, params, onEvent) {
       });
     }
   });
+  window.addEventListener("beforeunload", () => {
+    radio.close();
+  });
   return { commands };
 }
 

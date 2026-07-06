@@ -306,5 +306,9 @@ export async function startMonitor(
     }
   })
 
+  window.addEventListener("beforeunload", () => {
+    radio.close()
+  })
+
   return { commands }
 }
