@@ -66,7 +66,7 @@ function main(): void {
       origin: {
         name: "wms-js",
         sw: "0.1.0",
-        url: "https://github.com/giuseppe/wms-js",
+        url: "https://github.com/giannello/wms-js",
       },
       device: {
         identifiers: [`warema_wms_${serial}`],
@@ -95,7 +95,7 @@ function main(): void {
       origin: {
         name: "wms-js",
         sw: "0.1.0",
-        url: "https://github.com/giuseppe/wms-js",
+        url: "https://github.com/giannello/wms-js",
       },
       device: {
         identifiers: [`warema_wms_ws_${serial}`],
