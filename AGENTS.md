@@ -7,9 +7,9 @@
 Docker (or Podman with docker-compose compatibility) — that's it.
 
 ## Commands (all via compose)
-- `docker compose run --rm web npm test` — run all tests
-- `docker compose run --rm web npx tsc --noEmit` — typecheck
-- `docker compose run --rm web npm run build` — compile TS to dist/
+- `podman compose run --rm web npm test` — run all tests
+- `podman compose run --rm web npx tsc --noEmit` — typecheck
+- `podman compose run --rm web npm run build` — compile TS to dist/
 
 ## CLI debugger (needs USB stick)
 ```sh
@@ -45,6 +45,15 @@ read-write, so edits are reflected immediately. No local Node.js needed.
   without hardware: `simulateData()`, `simulateError()`, `simulateClose()`
 - Test files live alongside source: `packages/*/src/**/*.test.ts`
 
+## Logging
+`packages/lib/src/logging/logger.ts` — minimal logger gated by `WMS_LOG_LEVEL` env var:
+- Levels: `debug`, `info` (default), `warn`, `error`, `silent`
+- Set via `WMS_LOG_LEVEL=debug` or at runtime with `setLogLevel(LogLevel.DEBUG)`
+- Format: `[timestamp] [LVL] [TAG] message`
+- `info` level shows: `[MOVE]`, `[STOP]`, `[7071]` state changes
+- `debug` level adds: `[>>]`/`[<<]` serial I/O, `[8011]` overrides, raw 7071 frames
+- Graceful in browser where `process.env` is unavailable (defaults to `info`)
+
 ## Serial driver interface
 Defined in `packages/lib/src/serial/driver.ts`. Implementations:
 - `MockSerialDriver` — for tests (in `@warema/lib`)
@@ -71,6 +80,38 @@ Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
 - Network join (`5018`): prints serial, PAN ID, channel, key then exits
 
 **Scan response window**: `Commands.scanNetwork()` uses `responseWindowMs` to collect `7021` broadcast responses. During this window (~3s), all serial frames are consumed by the active command session — broadcasts (weather station, pairing, etc.) are suppressed. This is acceptable because scanning is infrequent and short-lived.
+
+## NetworkManager (new core module — WIP)
+`packages/lib/src/network/` contains a state machine replacing `Commands` + `RadioController`:
+- `events.ts` — `TypedEventEmitter<EventMap>` (zero-dep, portable)
+- `types.ts` — `ConnectionState`, `KnownDevice`, `NetworkEventMap`
+- `manager.ts` — `NetworkManager` class: fire-and-forget commands, broadcast frame
+  cascade, typed events, device registry with dedup, serial write queue
+- `manager.test.ts` — 18 tests
+
+### Design
+- All commands are fire-and-forget (no `CommandSession`).
+- All incoming frames treated as broadcasts processed via matcher cascade.
+- `processFrame()` cascade order: weatherStation → deviceScanResponse →
+  deviceStatus → moveResponse → waveResponse → waveRequest. First match wins.
+- Setup phase (open) still uses synchronous ack-wait with temporary `FrameParser`
+  and `sendAndWait` helper.
+
+### Known protocol frame formats
+- `scanNetwork(panId)`: writes `R04FFFFFF7020<panId>02` (was missing `7020`)
+- Device scan response: `r<serial>7021<panId><deviceType>…`
+- Device status: `r<serial>8011<6-pad><deviceType><pos><incl><v1><v2><moving>`
+- Move response: `r<serial>7071<10-pad><pos><incl>…`
+- Position hex = `Math.round(pos × 2)`, inclination hex = `Math.round(inc + 127)`
+
+### Web app changes
+- `packages/web/src/browser.ts` — `startMonitor` now returns `NetworkManager` instead of
+  `{ commands: Commands }`. Discovery wizard (`startDiscovery`) unchanged.
+- `packages/web/src/home.tsx` — reduced from 17 to 10 state vars. Uses `NetworkManager`'s
+  reactive events and fire-and-forget commands. `knownDevices` derived from
+  `manager.knownDevices` each render with `forceRender` counter. Wave/move messages
+  stored in local state, set optimistically before the serial write completes.
+- `packages/web/public/home-bundle.js` — esbuild output (28.6kb).
 
 ## Packages
 | Package | Entry point | Role |

@@ -3,6 +3,7 @@ import { serializeFrame } from "./frame/serializer.js"
 import { CommandSession } from "./command/session.js"
 import { type SessionOptions } from "./command/types.js"
 import { type SerialDriver } from "./serial/driver.js"
+import { debug } from "./logging/logger.js"
 
 export class RadioController {
   private driver: SerialDriver
@@ -85,7 +86,7 @@ export class RadioController {
     this.activeOp = op
     op._startAckTimer()
     const raw = serializeFrame(op.command)
-    console.error(`[${new Date().toISOString()}] [>>] ${op.command}`)
+    debug(">>", op.command)
     this.driver.write(raw)
   }
 
@@ -100,12 +101,12 @@ export class RadioController {
     if (this.activeOp !== null) {
       const consumed = this.activeOp.feedFrame(frame)
       if (consumed) {
-        console.error(`[${new Date().toISOString()}] [<<] ${frame}  (session: ${this.activeOp.command})`)
+        debug("<<", `${frame}  (session: ${this.activeOp.command})`)
         return
       }
     }
 
-    console.error(`[${new Date().toISOString()}] [<<] ${frame}  (broadcast)`)
+    debug("<<", `${frame}  (broadcast)`)
     for (const handler of this.broadcastHandlers) {
       handler(frame)
     }

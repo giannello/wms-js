@@ -10,12 +10,17 @@ services:
       target: dev
     command: npx tsx watch packages/mqtt-bridge/src/index.ts
     volumes:
+      - /dev:/dev
       - .:/app
       - node_modules:/app/node_modules
     depends_on:
       - mosquitto
     environment:
-      - MQTT_BROKER=mqtt://mosquitto:1883
+      - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - WMS_PORT=/dev/ttyUSB0
+      - WMS_CHANNEL=18
+      - WMS_PAN_ID=FFFF
+      - WMS_LOG_LEVEL=info
 
   web:
     build:

@@ -1,4 +1,5 @@
 import {
+  NetworkManager,
   RadioController,
   Commands,
   FrameParser,
@@ -246,23 +247,34 @@ export async function startMonitor(
   port: WMSerialPort,
   params: MonitorParams,
   onEvent: (event: DiscoveryEvent) => void,
-): Promise<{ commands: Commands }> {
+): Promise<NetworkManager> {
   const driver = new WebSerialDriver(port)
-  const radio = new RadioController(driver)
-  const commands = new Commands(radio)
+  const manager = new NetworkManager(driver)
 
-  radio.onError((error) => {
-    onEvent({ type: "error", timestamp: ts(), message: error.message })
+  manager.on("error", (e) => {
+    onEvent({ type: "error", timestamp: ts(), message: e.error.message })
+  })
+
+  manager.on("connected", () => {
+    onEvent({ type: "connected", timestamp: ts() })
+  })
+
+  manager.on("weatherStation", (e) => {
+    onEvent({
+      type: "weather-station",
+      timestamp: ts(),
+      serialNumber: e.serial,
+      windSpeed: e.windSpeed,
+    })
   })
 
   onEvent({ type: "log", timestamp: ts(), message: "Opening serial port..." })
-  await radio.open("web-serial")
 
   try {
-    await commands.setNetworkParameters({
-      receiveBroadcasts: true,
+    await manager.open("web-serial", {
       channel: params.channel,
       panId: params.panId,
+      key: params.key || undefined,
     })
     onEvent({
       type: "log",
@@ -275,40 +287,12 @@ export async function startMonitor(
       timestamp: ts(),
       message: `Failed to configure network: ${(e as Error).message}`,
     })
-    await radio.close()
-    throw new Error("Failed to configure network")
+    throw e
   }
-
-  try {
-    await commands.setEncryptionKey(params.key)
-    onEvent({ type: "log", timestamp: ts(), message: "Encryption key set" })
-  } catch (e) {
-    onEvent({
-      type: "error",
-      timestamp: ts(),
-      message: `Failed to set encryption key: ${(e as Error).message}`,
-    })
-    await radio.close()
-    throw new Error("Failed to set encryption key")
-  }
-
-  onEvent({ type: "connected", timestamp: ts() })
-
-  radio.onBroadcast((frame) => {
-    const ws = weatherStationMatcher(frame)
-    if (ws) {
-      onEvent({
-        type: "weather-station",
-        timestamp: ts(),
-        serialNumber: ws.serialNumber,
-        windSpeed: ws.windSpeed,
-      })
-    }
-  })
 
   window.addEventListener("beforeunload", () => {
-    radio.close()
+    manager.close()
   })
 
-  return { commands }
+  return manager
 }

@@ -1,8 +1,8 @@
-// src/ui.tsx
+// packages/web/src/ui.tsx
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-// ../lib/src/frame/errors.ts
+// packages/lib/src/frame/errors.ts
 var MalformedFrameError = class extends Error {
   partial;
   constructor(partial) {
@@ -12,7 +12,7 @@ var MalformedFrameError = class extends Error {
   }
 };
 
-// ../lib/src/frame/parser.ts
+// packages/lib/src/frame/parser.ts
 var decoder = new TextDecoder("utf-8", { fatal: false });
 var FrameParser = class {
   buffer = "";
@@ -81,13 +81,13 @@ var FrameParser = class {
   }
 };
 
-// ../lib/src/frame/serializer.ts
+// packages/lib/src/frame/serializer.ts
 var encoder = new TextEncoder();
 function serializeFrame(content) {
   return encoder.encode(`{${content}}`);
 }
 
-// ../lib/src/command/session.ts
+// packages/lib/src/command/session.ts
 var CommandSession = class {
   command;
   ack;
@@ -115,6 +115,9 @@ var CommandSession = class {
       this.resolveDone = resolve;
     });
     this.promise.then(() => this._onDone?.());
+  }
+  /** @internal called by RadioController when session becomes active */
+  _startAckTimer() {
     setTimeout(() => {
       if (this.cancelled || this.responseWindow) return;
       this.resolveAck?.({ kind: "timeout" });
@@ -179,7 +182,7 @@ var CommandSession = class {
   }
 };
 
-// ../lib/src/command/ack-match.ts
+// packages/lib/src/command/ack-match.ts
 var ackMatch = {
   exact(type) {
     return (frame) => frame === type ? "" : null;
@@ -189,7 +192,7 @@ var ackMatch = {
   }
 };
 
-// ../lib/src/controller.ts
+// packages/lib/src/controller.ts
 var RadioController = class {
   driver;
   parser = new FrameParser();
@@ -262,7 +265,10 @@ var RadioController = class {
     if (this.activeOp !== null || this.queue.length === 0) return;
     const op = this.queue.shift();
     this.activeOp = op;
-    this.driver.write(serializeFrame(op.command));
+    op._startAckTimer();
+    const raw = serializeFrame(op.command);
+    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [>>] ${op.command}`);
+    this.driver.write(raw);
   }
   onSerialData(data) {
     const frames = this.parser.feed(data);
@@ -274,9 +280,11 @@ var RadioController = class {
     if (this.activeOp !== null) {
       const consumed = this.activeOp.feedFrame(frame);
       if (consumed) {
+        console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (session: ${this.activeOp.command})`);
         return;
       }
     }
+    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (broadcast)`);
     for (const handler of this.broadcastHandlers) {
       handler(frame);
     }
@@ -298,7 +306,71 @@ var RadioController = class {
   }
 };
 
-// ../lib/src/commands/name.ts
+// packages/lib/src/parsers/device-scan-response.ts
+var DEVICE_TYPE_NAMES = {
+  "25": "Awning"
+};
+function getDeviceTypeName(code) {
+  return DEVICE_TYPE_NAMES[code] ?? "Unknown";
+}
+function deviceScanResponseMatcher(frame) {
+  if (frame.length < 57) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "7021") return null;
+  const deviceType = frame.slice(15, 17);
+  return {
+    serialNumber: frame.slice(1, 7),
+    panId: frame.slice(11, 15),
+    deviceType,
+    deviceTypeName: getDeviceTypeName(deviceType),
+    unknown: frame.slice(17, 57),
+    raw: frame
+  };
+}
+
+// packages/lib/src/parsers/device-status.ts
+function deviceStatusMatcher(frame) {
+  if (frame.length < 29) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "8011") return null;
+  const deviceType = frame.slice(17, 19);
+  return {
+    serialNumber: frame.slice(1, 7),
+    deviceType,
+    deviceTypeName: getDeviceTypeName(deviceType),
+    position: Math.round(parseInt(frame.slice(19, 21), 16) / 2),
+    inclination: parseInt(frame.slice(21, 23), 16) - 127,
+    valance1: parseInt(frame.slice(23, 25), 16),
+    valance2: parseInt(frame.slice(25, 27), 16),
+    moving: frame.slice(27, 29) === "01",
+    raw: frame
+  };
+}
+
+// packages/lib/src/parsers/wave-response.ts
+function waveResponseMatcher(frame) {
+  if (frame.length < 15) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "50AC") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
+    code: frame.slice(11, 15),
+    raw: frame
+  };
+}
+
+// packages/lib/src/parsers/wave-request.ts
+function waveRequestMatcher(frame) {
+  if (frame.length < 11) return null;
+  if (frame[0] !== "r") return null;
+  if (frame.slice(7, 11) !== "7050") return null;
+  return {
+    serialNumber: frame.slice(1, 7),
+    raw: frame
+  };
+}
+
+// packages/lib/src/commands/name.ts
 var Commands = class {
   constructor(radio) {
     this.radio = radio;
@@ -371,9 +443,138 @@ var Commands = class {
       throw new Error("setEncryptionKey: ack timeout");
     }
   }
+  // NOTE: responseWindowMs consumes ALL serial frames during the scan window,
+  // suppressing broadcast handlers (weather station, pairing, etc.). This is
+  // acceptable because scanning is infrequent and short-lived (~3s).
+  async scanNetwork(panId, timeoutMs = 3e3) {
+    if (!/^[0-9A-Fa-f]{4}$/.test(panId)) {
+      throw new Error("scanNetwork: invalid PAN ID");
+    }
+    const seen = /* @__PURE__ */ new Map();
+    const frame = `R04FFFFFF7020${panId.toUpperCase()}02`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    session.onResponse((content) => {
+      const parsed = deviceScanResponseMatcher(content);
+      if (parsed && !seen.has(parsed.serialNumber)) {
+        seen.set(parsed.serialNumber, parsed);
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("scanNetwork: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("scanNetwork: ack timeout");
+    }
+    await session.promise;
+    return [...seen.values()];
+  }
+  async getDeviceStatus(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("getDeviceStatus: invalid serial number");
+    }
+    const frame = `R06${serialNumber.toUpperCase()}801001000005`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    let result = null;
+    session.onResponse((content) => {
+      const parsed = deviceStatusMatcher(content);
+      if (parsed && !result) {
+        result = parsed;
+        session.cancel();
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("getDeviceStatus: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("getDeviceStatus: ack timeout");
+    }
+    await session.promise;
+    if (!result) {
+      throw new Error("getDeviceStatus: no response from device");
+    }
+    return result;
+  }
+  async waveDevice(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("waveDevice: invalid serial number");
+    }
+    const serial = serialNumber.toUpperCase();
+    const frame = `R06${serial}7050`;
+    const session = this.radio.send(frame, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: timeoutMs
+    });
+    let result = null;
+    session.onResponse((content) => {
+      if (result) return;
+      const wr = waveResponseMatcher(content);
+      if (wr && wr.serialNumber === serial) {
+        result = { serialNumber: wr.serialNumber, code: wr.code };
+        session.cancel();
+        return;
+      }
+      const wr2 = waveRequestMatcher(content);
+      if (wr2 && wr2.serialNumber === serial) {
+        result = { serialNumber: wr2.serialNumber };
+        session.cancel();
+      }
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error("waveDevice: command rejected");
+    }
+    if (ack.kind === "timeout") {
+      throw new Error("waveDevice: ack timeout");
+    }
+    await session.promise;
+    if (!result) {
+      throw new Error("waveDevice: no response from device");
+    }
+    return result;
+  }
+  async stopDevice(serialNumber, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("stopDevice: invalid serial number");
+    }
+    const cmd = `R06${serialNumber.toUpperCase()}707001`;
+    return this.sendMoveCommand(cmd, timeoutMs);
+  }
+  async moveToPosition(serialNumber, position, inclination = 0, timeoutMs = 2e3) {
+    if (!/^[0-9A-Fa-f]{6}$/.test(serialNumber)) {
+      throw new Error("moveToPosition: invalid serial number");
+    }
+    if (position < 0 || position > 100) {
+      throw new Error("moveToPosition: position must be 0-100");
+    }
+    const pp = Math.round(position * 2).toString(16).toUpperCase().padStart(2, "0");
+    const ww = Math.round(inclination + 127).toString(16).toUpperCase().padStart(2, "0");
+    const cmd = `R06${serialNumber.toUpperCase()}707003${pp}${ww}0000`;
+    return this.sendMoveCommand(cmd, timeoutMs);
+  }
+  async sendMoveCommand(rawCommand, timeoutMs) {
+    const session = this.radio.send(rawCommand, {
+      ackMatcher: ackMatch.exact("a"),
+      responseWindowMs: 0
+    });
+    const ack = await session.ack;
+    if (ack.kind === "fail") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: command rejected`);
+    }
+    if (ack.kind === "timeout") {
+      throw new Error(`${rawCommand.startsWith("R06") && rawCommand.includes("707001") ? "stopDevice" : "moveToPosition"}: ack timeout`);
+    }
+  }
 };
 
-// ../lib/src/parsers/weather-station.ts
+// packages/lib/src/parsers/weather-station.ts
 function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
@@ -385,7 +586,7 @@ function weatherStationMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/network-params.ts
+// packages/lib/src/parsers/network-params.ts
 function networkParamsMatcher(frame) {
   if (frame.length < 21) return null;
   if (frame[0] !== "r") return null;
@@ -401,7 +602,7 @@ function networkParamsMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/device-scan.ts
+// packages/lib/src/parsers/device-scan.ts
 function deviceScanMatcher(frame) {
   if (frame.length < 17) return null;
   if (frame[0] !== "r") return null;
@@ -413,18 +614,7 @@ function deviceScanMatcher(frame) {
   };
 }
 
-// ../lib/src/parsers/wave-request.ts
-function waveRequestMatcher(frame) {
-  if (frame.length < 11) return null;
-  if (frame[0] !== "r") return null;
-  if (frame.slice(7, 11) !== "7050") return null;
-  return {
-    serialNumber: frame.slice(1, 7),
-    raw: frame
-  };
-}
-
-// ../lib/src/parsers/network-join.ts
+// packages/lib/src/parsers/network-join.ts
 function networkJoinMatcher(frame) {
   if (frame.length < 51) return null;
   if (frame[0] !== "r") return null;
@@ -449,7 +639,7 @@ function decodeKey(hex) {
   return out;
 }
 
-// src/drivers/web-serial.ts
+// packages/web/src/drivers/web-serial.ts
 var WebSerialDriver = class {
   constructor(port) {
     this.port = port;
@@ -531,7 +721,7 @@ var WebSerialDriver = class {
   }
 };
 
-// src/browser.ts
+// packages/web/src/browser.ts
 function ts() {
   const d = /* @__PURE__ */ new Date();
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0");
@@ -567,10 +757,10 @@ async function startDiscovery(port, onEvent) {
     onEvent({
       type: "error",
       timestamp: ts(),
-      message: `Failed to get stick name: ${e.message}`
+      message: `Failed to configure network: ${e.message}`
     });
     await radio.close();
-    return;
+    throw new Error("Failed to configure network");
   }
   onEvent({ type: "connected", timestamp: ts() });
   try {
@@ -719,7 +909,7 @@ async function startDiscovery(port, onEvent) {
   });
 }
 
-// src/ui.tsx
+// packages/web/src/ui.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
 function App() {
   const [port, setPort] = React.useState(null);

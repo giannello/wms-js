@@ -126,6 +126,78 @@ rXXXXXX5018PPPPKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKFFCC
 | 47–48 | 2   | `FF`      | Constant                            |
 | 49–50 | 2   | Channel   | Radio channel (hex, 11–26 decimal)  |
 
+## Device Move / Stop
+
+Commands sent to a device to control its position. The stick wraps requests in
+braces; responses are unwrapped broadcasts from the device.
+
+### Request (Move to position)
+
+```
+{R06 XXXXXX 7070 CC PP WW V1 V2}
+```
+
+| Pos   | Len | Field    | Description                         |
+|-------|-----|----------|-------------------------------------|
+| 0–2   | 3   | Prefix   | Always `R06`                        |
+| 3–8   | 6   | Serial   | Target device serial number         |
+| 9–12  | 4   | Msg Type | Always `7070`                       |
+| 13–14 | 2   | Command  | `01` = stop, `03` = move to position |
+| 15–16 | 2   | PP       | Target position (hex, 00–C8)       |
+| 17–18 | 2   | WW       | Target inclination (hex, 00–FE)    |
+| 19–20 | 2   | V1       | Valance 1 (unused, send `00`)      |
+| 21–22 | 2   | V2       | Valance 2 (unused, send `00`)      |
+
+- Ack: `{a}` — command accepted
+- Rejected: `{f}`
+
+### Request (Stop)
+
+```
+{R06 XXXXXX 7070 01}
+```
+
+| Pos   | Len | Field    | Description                   |
+|-------|-----|----------|-------------------------------|
+| 0–2   | 3   | Prefix   | Always `R06`                  |
+| 3–8   | 6   | Serial   | Target device serial number   |
+| 9–12  | 4   | Msg Type | Always `7070`                 |
+| 13–14 | 2   | Command  | `01` = stop                   |
+
+### Response (broadcast)
+
+Sent by the device after processing the command. Carries the **previous** target
+position (not the current device position).
+
+```
+r XXXXXX 7071 0010023F02 pp ww FFFF0C0DFFFF
+```
+
+| Pos   | Len | Field              | Description                              |
+|-------|-----|--------------------|------------------------------------------|
+| 0     | 1   | Type               | Always `r`                               |
+| 1–6   | 6   | Serial             | Device serial number                     |
+| 7–10  | 4   | Msg Type           | Always `7071`                            |
+| 11–22 | 12  | Header             | Fixed (`0010023F02` or `0010023D02`)     |
+| 23–24 | 2   | pp                 | Previous target position (hex, `00`–`C8` = 0–100%, `FF` = none) |
+| 25–26 | 2   | ww                 | Previous target inclination (hex, `00`–`FE`, `7F` = 0°) |
+| 27+   | —   | Remainder          | Always `FFFF0C0DFFFF` in observed data   |
+
+**pp encoding**: `Math.round(position × 2)` → hex. `FF` = 128% means "no
+previous target" (e.g. after stop or first ever command).
+
+**Real-world examples**:
+
+| Command | Response pp | Meaning                            |
+|---------|-------------|------------------------------------|
+| UP      | `00` (0%)   | Previous target was fully retracted |
+| DOWN    | `C8` (100%) | Previous target was fully extended  |
+| STOP    | `FF` (128%) | No previous target (stop processed) |
+
+After receiving a 7071 with valid pp (0-100%), the state machine marks the
+device as `moving: true`. The subsequent 8011 status response provides the
+actual current position and moving state.
+
 ## Weather Station Broadcast
 
 Unsolicited broadcast from a weather station. Frame type `r`, message type `7080`.

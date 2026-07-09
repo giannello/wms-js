@@ -8,6 +8,7 @@ describe("moveResponseMatcher", () => {
 
     expect(result).not.toBeNull()
     expect(result!.serialNumber).toBe("ABCDEF")
+    expect(result!.subCommand).toBe(3)
     expect(result!.previousPosition).toBe(75)
     expect(result!.previousInclination).toBe(0)
     expect(result!.raw).toBe(frame)
@@ -18,6 +19,7 @@ describe("moveResponseMatcher", () => {
     const result = moveResponseMatcher(frame)
 
     expect(result).not.toBeNull()
+    expect(result!.subCommand).toBe(3)
     expect(result!.previousPosition).toBe(100)
     expect(result!.previousInclination).toBe(0)
   })
@@ -27,8 +29,19 @@ describe("moveResponseMatcher", () => {
     const result = moveResponseMatcher(frame)
 
     expect(result).not.toBeNull()
+    expect(result!.subCommand).toBe(3)
     expect(result!.previousPosition).toBe(50)
     expect(result!.previousInclination).toBe(0)
+  })
+
+  it("parses a stop response (3D)", () => {
+    const frame = "rABCDEF70710010023D02FFFFFFFF0CFFFFFF"
+    const result = moveResponseMatcher(frame)
+
+    expect(result).not.toBeNull()
+    expect(result!.subCommand).toBe(1)
+    expect(result!.previousPosition).toBe(128)
+    expect(result!.previousInclination).toBe(128)
   })
 
   it("returns null if frame does not start with r", () => {
