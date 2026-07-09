@@ -101,12 +101,12 @@ jobs:
             delete pkg.files;
             require('fs').writeFileSync('./packages/mqtt-bridge/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
-      - run: npm publish packages/lib/dist
+      - run: npm publish packages/lib/dist --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm publish packages/cli/dist
+      - run: npm publish packages/cli/dist --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm publish packages/mqtt-bridge/dist
+      - run: npm publish packages/mqtt-bridge/dist --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
