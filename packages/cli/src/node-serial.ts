@@ -1,4 +1,4 @@
-import { type SerialDriver } from "@warema/lib"
+import { type SerialDriver } from "@wms-js/lib"
 import { SerialPort } from "serialport"
 
 export class NodeSerialDriver implements SerialDriver {

@@ -8,7 +8,7 @@ import {
   waveRequestMatcher,
   networkJoinMatcher,
   weatherStationMatcher,
-} from "@warema/lib"
+} from "@wms-js/lib"
 import { WebSerialDriver, type WMSerialPort } from "./drivers/web-serial.js"
 
 export type DiscoveryEventType =

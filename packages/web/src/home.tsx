@@ -1,8 +1,8 @@
 import React from "react"
 import { createRoot } from "react-dom/client"
 import { startMonitor, type DiscoveryEvent } from "./browser.js"
-import type { NetworkManager, KnownDevice, LogLevel } from "@warema/lib"
-import { setLogLevel, LogLevel as LV } from "@warema/lib"
+import type { NetworkManager, KnownDevice, LogLevel } from "@wms-js/lib"
+import { setLogLevel, LogLevel as LV } from "@wms-js/lib"
 
 const NAMES_KEY = "wms-device-names"
 const HIDDEN_KEY = "wms-hidden-serials"

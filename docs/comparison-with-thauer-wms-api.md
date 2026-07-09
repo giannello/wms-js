@@ -1,4 +1,4 @@
-# Comparison with thauer/warema-wms-api
+# Comparison with thauer/warema-wms-api (reference)
 
 Reference: https://github.com/thauer/warema-wms-api
 

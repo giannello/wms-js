@@ -1,4 +1,4 @@
-# warema-wms
+# wms-js
 
 ## Dependency pinning
 `.npmrc` has `save-exact=true` — all versions pinned exactly. Never add `^` or `~`.
@@ -36,8 +36,8 @@ All services run via `tsx watch` inside the container — source is mounted
 read-write, so edits are reflected immediately. No local Node.js needed.
 
 ## Module resolution
-`@warema/lib/package.json` has an `exports` field pointing to `./src/index.ts`.
-`tsx` resolves `@warema/lib` to TS source directly — no build step in dev.
+`@wms-js/lib/package.json` has an `exports` field pointing to `./src/index.ts`.
+`tsx` resolves `@wms-js/lib` to TS source directly — no build step in dev.
 
 ## Testing
 - Vitest with `vi.useFakeTimers()` for protocol timeout tests
@@ -56,8 +56,8 @@ read-write, so edits are reflected immediately. No local Node.js needed.
 
 ## Serial driver interface
 Defined in `packages/lib/src/serial/driver.ts`. Implementations:
-- `MockSerialDriver` — for tests (in `@warema/lib`)
-- `NodeSerialDriver` — real serialport via npm package (in `@warema/cli`)
+- `MockSerialDriver` — for tests (in `@wms-js/lib`)
+- `NodeSerialDriver` — real serialport via npm package (in `@wms-js/cli`)
 
 ## Protocol
 Frames are `{...}` delimited. `{f}` = command rejected, `{a}` = success.
@@ -116,7 +116,7 @@ Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
 ## Packages
 | Package | Entry point | Role |
 |---------|-------------|------|
-| `@warema/lib` | `packages/lib/src/index.ts` | Core: frame parsing, sessions, controller, commands, broadcast routing |
-| `@warema/mqtt-bridge` | `packages/mqtt-bridge/src/index.ts` | MQTT relay (stub — waiting for lib integration) |
-| `@warema/web` | `packages/web/src/index.ts` | Web service (stub — waiting for framework) |
-| `@warema/cli` | `packages/cli/src/index.ts` | CLI debugger |
+| `@wms-js/lib` | `packages/lib/src/index.ts` | Core: frame parsing, sessions, controller, commands, broadcast routing |
+| `@wms-js/mqtt-bridge` | `packages/mqtt-bridge/src/index.ts` | MQTT relay (stub — waiting for lib integration) |
+| `@wms-js/web` | `packages/web/src/index.ts` | Web service (stub — waiting for framework) |
+| `@wms-js/cli` | `packages/cli/src/index.ts` | CLI debugger |

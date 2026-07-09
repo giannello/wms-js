@@ -39,8 +39,8 @@ export function loadConfig(): Config {
     mqttBrokerUrl: process.env["MQTT_BROKER_URL"] ?? "mqtt://localhost:1883",
     mqttUsername: process.env["MQTT_USERNAME"] || undefined,
     mqttPassword: process.env["MQTT_PASSWORD"] || undefined,
-    mqttTopicPrefix: process.env["MQTT_TOPIC_PREFIX"] ?? "warema",
+    mqttTopicPrefix: process.env["MQTT_TOPIC_PREFIX"] ?? "warema_wms",
     mqttDiscoveryPrefix: process.env["MQTT_DISCOVERY_PREFIX"] ?? "homeassistant",
-    mqttClientId: process.env["MQTT_CLIENT_ID"] ?? "warema-mqtt-bridge",
+    mqttClientId: process.env["MQTT_CLIENT_ID"] ?? "wms-js-mqtt-bridge",
   }
 }

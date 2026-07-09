@@ -1,5 +1,5 @@
 {
-  "name": "@warema/lib",
+  "name": "@wms-js/lib",
   "type": "module",
   "main": "dist/packages/lib/src/index.js",
   "types": "src/index.ts",

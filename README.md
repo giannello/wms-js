@@ -1,4 +1,4 @@
-# warema-wms
+# wms-js
 
 Control Warema WMS radio devices (covers, weather stations) via a USB serial stick.
 
@@ -6,16 +6,16 @@ Control Warema WMS radio devices (covers, weather stations) via a USB serial sti
 
 | Package | Description |
 |---------|-------------|
-| `@warema/lib` | Core library — frame parsing, command sessions, controller, broadcast routing |
-| `@warema/mqtt-bridge` | MQTT bridge — relays radio messages to a Home Assistant MQTT broker |
-| `@warema/web` | Web service (stub) |
-| `@warema/cli` | CLI debugger — interact with the stick from the command line |
+| `@wms-js/lib` | Core library — frame parsing, command sessions, controller, broadcast routing |
+| `@wms-js/mqtt-bridge` | MQTT bridge — relays radio messages to a Home Assistant MQTT broker |
+| `@wms-js/web` | Web service (stub) |
+| `@wms-js/cli` | CLI debugger — interact with the stick from the command line |
 
 ## Setup
 
 ```sh
 git clone <repo>
-cd warema-wms
+cd wms-js
 npm install
 ```
 

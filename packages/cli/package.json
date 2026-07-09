@@ -1,11 +1,11 @@
 {
-  "name": "@warema/cli",
+  "name": "@wms-js/cli",
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@warema/lib": "*",
+    "@wms-js/lib": "*",
     "serialport": "13.0.0"
   }
 }

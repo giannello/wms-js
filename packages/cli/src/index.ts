@@ -1,4 +1,4 @@
-import { RadioController, Commands, weatherStationMatcher, networkParamsMatcher, deviceScanMatcher, waveRequestMatcher, networkJoinMatcher } from "@warema/lib"
+import { RadioController, Commands, weatherStationMatcher, networkParamsMatcher, deviceScanMatcher, waveRequestMatcher, networkJoinMatcher } from "@wms-js/lib"
 import { NodeSerialDriver } from "./node-serial.js"
 
 function timestamp(): string {

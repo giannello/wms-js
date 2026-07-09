@@ -1,4 +1,4 @@
-import type { SerialDriver } from "@warema/lib"
+import type { SerialDriver } from "@wms-js/lib"
 
 export interface WMSerialPort {
   open(options: { baudRate: number }): Promise<void>

@@ -1,6 +1,6 @@
 import mqtt from "mqtt"
-import { NetworkManager } from "@warema/lib"
-import { info, error, debug } from "@warema/lib"
+import { NetworkManager } from "@wms-js/lib"
+import { info, error, debug } from "@wms-js/lib"
 import { loadConfig, type Config } from "./config.js"
 import { NodeSerialDriver } from "./driver.js"
 
@@ -44,11 +44,11 @@ function main(): void {
   }
 
   function publishCoverDiscovery(serial: string, deviceTypeName: string): void {
-    const topic = `${config.mqttDiscoveryPrefix}/cover/warema_${serial}/config`
+    const topic = `${config.mqttDiscoveryPrefix}/cover/warema_wms_${serial}/config`
     const payload = JSON.stringify({
       "~": config.mqttTopicPrefix,
       name: null,
-      unique_id: `warema_${serial}`,
+      unique_id: `warema_wms_${serial}`,
       device_class: "shade",
       command_topic: `~/${serial}/command`,
       state_topic: `~/${serial}/status`,
@@ -64,12 +64,12 @@ function main(): void {
       payload_stop: "STOP",
       qos: 1,
       origin: {
-        name: "warema-wms",
+        name: "wms-js",
         sw: "0.1.0",
-        url: "https://github.com/giuseppe/warema-wms",
+        url: "https://github.com/giuseppe/wms-js",
       },
       device: {
-        identifiers: [`warema_${serial}`],
+        identifiers: [`warema_wms_${serial}`],
         name: `${deviceTypeName}`,
         manufacturer: "Warema",
         model: "WMS Plug receiver",
@@ -81,11 +81,11 @@ function main(): void {
   }
 
   function publishWsDiscovery(serial: string): void {
-    const topic = `${config.mqttDiscoveryPrefix}/sensor/warema_ws_${serial}/config`
+    const topic = `${config.mqttDiscoveryPrefix}/sensor/warema_wms_ws_${serial}/config`
     const payload = JSON.stringify({
       "~": config.mqttTopicPrefix,
       name: "Wind Speed",
-      unique_id: `warema_ws_${serial}`,
+      unique_id: `warema_wms_ws_${serial}`,
       state_topic: `~/weather/${serial}`,
       unit_of_measurement: "km/h",
       value_template: "{{ value_json.wind_speed }}",
@@ -93,12 +93,12 @@ function main(): void {
       state_class: "measurement",
       qos: 0,
       origin: {
-        name: "warema-wms",
+        name: "wms-js",
         sw: "0.1.0",
-        url: "https://github.com/giuseppe/warema-wms",
+        url: "https://github.com/giuseppe/wms-js",
       },
       device: {
-        identifiers: [`warema_ws_${serial}`],
+        identifiers: [`warema_wms_ws_${serial}`],
         name: "Weather Station",
         manufacturer: "Warema",
         model: "WMS Weather station",
