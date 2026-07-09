@@ -1,8 +1,8 @@
 {
   "name": "@wms-js/lib",
+  "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
-  "main": "dist/packages/lib/src/index.js",
-  "types": "src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -10,7 +10,20 @@
     },
     "./*": "./src/*"
   },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3"
   }
 }

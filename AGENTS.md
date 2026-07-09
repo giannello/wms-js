@@ -113,6 +113,43 @@ Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
   stored in local state, set optimistically before the serial write completes.
 - `packages/web/public/home-bundle.js` — esbuild output (28.6kb).
 
+## Publishing `@wms-js/lib` to npm
+
+### Automated (CI, recommended)
+Push a version tag to trigger CI publish:
+```sh
+git checkout main && git pull
+npm version 0.1.0 -w @wms-js/lib   # bumps version, commits, tags v0.1.0
+git push && git push --tags          # CI: tests → build → publish
+```
+
+### Manual (local, fallback)
+```sh
+npm run build -w @wms-js/lib
+cp packages/lib/README.md packages/lib/dist/
+cp packages/lib/LICENSE packages/lib/dist/
+node -e "
+  const pkg = require('./packages/lib/package.json');
+  pkg.main = 'index.js';
+  pkg.types = 'index.d.ts';
+  pkg.exports = {
+    '.': { types: './index.d.ts', import: './index.js' },
+    './*': { types: './*.d.ts', import: './*.js' }
+  };
+  delete pkg.scripts;
+  delete pkg.devDependencies;
+  delete pkg.publishConfig;
+  delete pkg.files;
+  require('fs').writeFileSync('./packages/lib/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+npm publish packages/lib/dist --access public
+```
+
+### Prerequisites
+- `npm login` on your machine
+- `NPM_TOKEN` set in GitHub repo secrets (automation token, publish scope)
+- `@wms-js` scope on npm (already done)
+
 ## Packages
 | Package | Entry point | Role |
 |---------|-------------|------|

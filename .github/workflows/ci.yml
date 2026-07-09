@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
 
@@ -18,3 +19,38 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  publish:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build -w @wms-js/lib
+      - name: Prepare dist for publish
+        run: |
+          node -e "
+            const pkg = require('./packages/lib/package.json');
+            pkg.main = 'index.js';
+            pkg.types = 'index.d.ts';
+            pkg.exports = {
+              '.': { types: './index.d.ts', import: './index.js' },
+              './*': { types: './*.d.ts', import: './*.js' }
+            };
+            delete pkg.scripts;
+            delete pkg.devDependencies;
+            delete pkg.publishConfig;
+            delete pkg.files;
+            require('fs').writeFileSync('./packages/lib/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          cp packages/lib/README.md packages/lib/dist/
+          cp packages/lib/LICENSE packages/lib/dist/
+      - run: npm publish packages/lib/dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
