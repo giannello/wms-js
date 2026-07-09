@@ -1,8 +1,8 @@
-// packages/web/src/ui.tsx
+// src/ui.tsx
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-// packages/lib/src/frame/errors.ts
+// ../lib/src/frame/errors.ts
 var MalformedFrameError = class extends Error {
   partial;
   constructor(partial) {
@@ -12,7 +12,7 @@ var MalformedFrameError = class extends Error {
   }
 };
 
-// packages/lib/src/frame/parser.ts
+// ../lib/src/frame/parser.ts
 var decoder = new TextDecoder("utf-8", { fatal: false });
 var FrameParser = class {
   buffer = "";
@@ -65,9 +65,9 @@ var FrameParser = class {
   startMalformedTimer(partial) {
     this.clearMalformedTimer();
     this.malformedTimer = setTimeout(() => {
-      const error = new MalformedFrameError(partial);
+      const error2 = new MalformedFrameError(partial);
       if (this.malformedHandler) {
-        this.malformedHandler(error);
+        this.malformedHandler(error2);
       }
       this.buffer = this.buffer.replace(partial, "");
       this.malformedTimer = null;
@@ -81,13 +81,13 @@ var FrameParser = class {
   }
 };
 
-// packages/lib/src/frame/serializer.ts
+// ../lib/src/frame/serializer.ts
 var encoder = new TextEncoder();
 function serializeFrame(content) {
   return encoder.encode(`{${content}}`);
 }
 
-// packages/lib/src/command/session.ts
+// ../lib/src/command/session.ts
 var CommandSession = class {
   command;
   ack;
@@ -182,7 +182,7 @@ var CommandSession = class {
   }
 };
 
-// packages/lib/src/command/ack-match.ts
+// ../lib/src/command/ack-match.ts
 var ackMatch = {
   exact(type) {
     return (frame) => frame === type ? "" : null;
@@ -192,7 +192,54 @@ var ackMatch = {
   }
 };
 
-// packages/lib/src/controller.ts
+// ../lib/src/logging/logger.ts
+var LogLevel = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+  SILENT: 4
+};
+var levelNames = {
+  debug: LogLevel.DEBUG,
+  info: LogLevel.INFO,
+  warn: LogLevel.WARN,
+  error: LogLevel.ERROR,
+  silent: LogLevel.SILENT
+};
+function parseLevel() {
+  if (typeof process !== "undefined" && process.env?.WMS_LOG_LEVEL) {
+    const n = levelNames[process.env.WMS_LOG_LEVEL.toLowerCase()];
+    if (n !== void 0) return n;
+  }
+  return LogLevel.INFO;
+}
+var currentLevel = parseLevel();
+var label = (level) => {
+  switch (level) {
+    case LogLevel.DEBUG:
+      return "DBG";
+    case LogLevel.INFO:
+      return "INF";
+    case LogLevel.WARN:
+      return "WRN";
+    case LogLevel.ERROR:
+      return "ERR";
+    default:
+      return "???";
+  }
+};
+var timestamp = () => (/* @__PURE__ */ new Date()).toISOString();
+function log(level, tag, message, ...rest) {
+  if (level < currentLevel) return;
+  const fn = level >= LogLevel.ERROR ? console.error : level >= LogLevel.WARN ? console.warn : console.log;
+  fn(`[${timestamp()}] [${label(level)}] [${tag}] ${message}`, ...rest);
+}
+function debug(tag, message, ...rest) {
+  log(LogLevel.DEBUG, tag, message, ...rest);
+}
+
+// ../lib/src/controller.ts
 var RadioController = class {
   driver;
   parser = new FrameParser();
@@ -204,8 +251,8 @@ var RadioController = class {
   _isOpen = false;
   constructor(driver) {
     this.driver = driver;
-    this.parser.onMalformedFrame((error) => {
-      this.emitError(error);
+    this.parser.onMalformedFrame((error2) => {
+      this.emitError(error2);
     });
   }
   get isOpen() {
@@ -218,7 +265,7 @@ var RadioController = class {
       this.driver.onData((data) => this.onSerialData(data))
     );
     this.unsubs.push(
-      this.driver.onError((error) => this.emitError(error))
+      this.driver.onError((error2) => this.emitError(error2))
     );
     this.unsubs.push(
       this.driver.onClose(() => this.onSerialClose())
@@ -267,7 +314,7 @@ var RadioController = class {
     this.activeOp = op;
     op._startAckTimer();
     const raw = serializeFrame(op.command);
-    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [>>] ${op.command}`);
+    debug(">>", op.command);
     this.driver.write(raw);
   }
   onSerialData(data) {
@@ -280,11 +327,11 @@ var RadioController = class {
     if (this.activeOp !== null) {
       const consumed = this.activeOp.feedFrame(frame);
       if (consumed) {
-        console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (session: ${this.activeOp.command})`);
+        debug("<<", `${frame}  (session: ${this.activeOp.command})`);
         return;
       }
     }
-    console.error(`[${(/* @__PURE__ */ new Date()).toISOString()}] [<<] ${frame}  (broadcast)`);
+    debug("<<", `${frame}  (broadcast)`);
     for (const handler of this.broadcastHandlers) {
       handler(frame);
     }
@@ -295,9 +342,9 @@ var RadioController = class {
       this.activeOp = null;
     }
   }
-  emitError(error) {
+  emitError(error2) {
     for (const handler of this.errorHandlers) {
-      handler(error);
+      handler(error2);
     }
   }
   onSerialClose() {
@@ -306,7 +353,7 @@ var RadioController = class {
   }
 };
 
-// packages/lib/src/parsers/device-scan-response.ts
+// ../lib/src/parsers/device-scan-response.ts
 var DEVICE_TYPE_NAMES = {
   "25": "Shade"
 };
@@ -328,7 +375,7 @@ function deviceScanResponseMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/device-status.ts
+// ../lib/src/parsers/device-status.ts
 function deviceStatusMatcher(frame) {
   if (frame.length < 29) return null;
   if (frame[0] !== "r") return null;
@@ -343,11 +390,12 @@ function deviceStatusMatcher(frame) {
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",
+    direction: "stopped",
     raw: frame
   };
 }
 
-// packages/lib/src/parsers/wave-response.ts
+// ../lib/src/parsers/wave-response.ts
 function waveResponseMatcher(frame) {
   if (frame.length < 15) return null;
   if (frame[0] !== "r") return null;
@@ -359,7 +407,7 @@ function waveResponseMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/wave-request.ts
+// ../lib/src/parsers/wave-request.ts
 function waveRequestMatcher(frame) {
   if (frame.length < 11) return null;
   if (frame[0] !== "r") return null;
@@ -370,7 +418,7 @@ function waveRequestMatcher(frame) {
   };
 }
 
-// packages/lib/src/commands/name.ts
+// ../lib/src/commands/name.ts
 var Commands = class {
   constructor(radio) {
     this.radio = radio;
@@ -574,7 +622,7 @@ var Commands = class {
   }
 };
 
-// packages/lib/src/parsers/weather-station.ts
+// ../lib/src/parsers/weather-station.ts
 function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
@@ -586,7 +634,7 @@ function weatherStationMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/network-params.ts
+// ../lib/src/parsers/network-params.ts
 function networkParamsMatcher(frame) {
   if (frame.length < 21) return null;
   if (frame[0] !== "r") return null;
@@ -602,7 +650,7 @@ function networkParamsMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/device-scan.ts
+// ../lib/src/parsers/device-scan.ts
 function deviceScanMatcher(frame) {
   if (frame.length < 17) return null;
   if (frame[0] !== "r") return null;
@@ -614,7 +662,7 @@ function deviceScanMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/network-join.ts
+// ../lib/src/parsers/network-join.ts
 function networkJoinMatcher(frame) {
   if (frame.length < 51) return null;
   if (frame[0] !== "r") return null;
@@ -639,7 +687,7 @@ function decodeKey(hex) {
   return out;
 }
 
-// packages/web/src/drivers/web-serial.ts
+// src/drivers/web-serial.ts
 var WebSerialDriver = class {
   constructor(port) {
     this.port = port;
@@ -721,7 +769,7 @@ var WebSerialDriver = class {
   }
 };
 
-// packages/web/src/browser.ts
+// src/browser.ts
 function ts() {
   const d = /* @__PURE__ */ new Date();
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0");
@@ -744,8 +792,8 @@ async function startDiscovery(port, onEvent) {
     onEvent({ type: "log", timestamp: ts(), message: `[>>] {${inner}}` });
     await originalWrite(data);
   };
-  radio.onError((error) => {
-    onEvent({ type: "error", timestamp: ts(), message: error.message });
+  radio.onError((error2) => {
+    onEvent({ type: "error", timestamp: ts(), message: error2.message });
   });
   onEvent({ type: "log", timestamp: ts(), message: "Opening serial port..." });
   await radio.open("web-serial");
@@ -909,7 +957,7 @@ async function startDiscovery(port, onEvent) {
   });
 }
 
-// packages/web/src/ui.tsx
+// src/ui.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
 function App() {
   const [port, setPort] = React.useState(null);
@@ -917,7 +965,7 @@ function App() {
   const [step, setStep] = React.useState("connect");
   const [events, setEvents] = React.useState([]);
   const [result, setResult] = React.useState(null);
-  const [error, setError] = React.useState("");
+  const [error2, setError] = React.useState("");
   const eventsRef = React.useRef([]);
   const logEndRef = React.useRef(null);
   const addEvent = React.useCallback((evt) => {
@@ -1065,7 +1113,7 @@ function App() {
         " button on your remote to return it to normal operation."
       ] })
     ] }),
-    error && step !== "complete" && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: error }),
+    error2 && step !== "complete" && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: error2 }),
     /* @__PURE__ */ jsxs("details", { className: "text-sm", children: [
       /* @__PURE__ */ jsx("summary", { className: "text-gray-500 cursor-pointer hover:text-gray-300 transition-colors", children: "Technical Details" }),
       /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 rounded-lg p-3 mt-2 h-64 overflow-y-auto leading-relaxed", children: [

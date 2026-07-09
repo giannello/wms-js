@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "build:discovery": "esbuild src/ui.tsx --bundle --outfile=public/discovery-bundle.js --format=esm --platform=browser --jsx=automatic --external:react --external:react-dom",
-    "build:home": "esbuild src/home.tsx --bundle --outfile=public/home-bundle.js --format=esm --platform=browser --jsx=automatic --external:react --external:react-dom"
+    "build:home": "esbuild src/home.tsx --bundle --outfile=public/home-bundle.js --format=esm --platform=browser --jsx=automatic --external:react --external:react-dom",
+    "build:pages": "npm run build:discovery && npm run build:home"
   },
   "dependencies": {
     "@wms-js/lib": "*"

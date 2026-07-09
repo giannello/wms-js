@@ -20,6 +20,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  deploy-pages:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+      - run: npm ci
+      - name: Build web bundles
+        run: npm run build:pages -w @wms-js/web
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/web/public
+
   publish:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')

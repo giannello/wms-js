@@ -1,8 +1,8 @@
-// packages/web/src/home.tsx
+// src/home.tsx
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-// packages/lib/src/frame/errors.ts
+// ../lib/src/frame/errors.ts
 var MalformedFrameError = class extends Error {
   partial;
   constructor(partial) {
@@ -12,7 +12,7 @@ var MalformedFrameError = class extends Error {
   }
 };
 
-// packages/lib/src/frame/parser.ts
+// ../lib/src/frame/parser.ts
 var decoder = new TextDecoder("utf-8", { fatal: false });
 var FrameParser = class {
   buffer = "";
@@ -65,9 +65,9 @@ var FrameParser = class {
   startMalformedTimer(partial) {
     this.clearMalformedTimer();
     this.malformedTimer = setTimeout(() => {
-      const error = new MalformedFrameError(partial);
+      const error2 = new MalformedFrameError(partial);
       if (this.malformedHandler) {
-        this.malformedHandler(error);
+        this.malformedHandler(error2);
       }
       this.buffer = this.buffer.replace(partial, "");
       this.malformedTimer = null;
@@ -81,13 +81,13 @@ var FrameParser = class {
   }
 };
 
-// packages/lib/src/frame/serializer.ts
+// ../lib/src/frame/serializer.ts
 var encoder = new TextEncoder();
 function serializeFrame(content) {
   return encoder.encode(`{${content}}`);
 }
 
-// packages/lib/src/command/ack-match.ts
+// ../lib/src/command/ack-match.ts
 var ackMatch = {
   exact(type) {
     return (frame) => frame === type ? "" : null;
@@ -97,7 +97,7 @@ var ackMatch = {
   }
 };
 
-// packages/lib/src/logging/logger.ts
+// ../lib/src/logging/logger.ts
 var LogLevel = {
   DEBUG: 0,
   INFO: 1,
@@ -150,7 +150,7 @@ function info(tag, message, ...rest) {
   log(LogLevel.INFO, tag, message, ...rest);
 }
 
-// packages/lib/src/parsers/device-scan-response.ts
+// ../lib/src/parsers/device-scan-response.ts
 var DEVICE_TYPE_NAMES = {
   "25": "Shade"
 };
@@ -172,7 +172,7 @@ function deviceScanResponseMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/device-status.ts
+// ../lib/src/parsers/device-status.ts
 function deviceStatusMatcher(frame) {
   if (frame.length < 29) return null;
   if (frame[0] !== "r") return null;
@@ -187,11 +187,12 @@ function deviceStatusMatcher(frame) {
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",
+    direction: "stopped",
     raw: frame
   };
 }
 
-// packages/lib/src/parsers/wave-response.ts
+// ../lib/src/parsers/wave-response.ts
 function waveResponseMatcher(frame) {
   if (frame.length < 15) return null;
   if (frame[0] !== "r") return null;
@@ -203,7 +204,7 @@ function waveResponseMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/wave-request.ts
+// ../lib/src/parsers/wave-request.ts
 function waveRequestMatcher(frame) {
   if (frame.length < 11) return null;
   if (frame[0] !== "r") return null;
@@ -214,7 +215,7 @@ function waveRequestMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/weather-station.ts
+// ../lib/src/parsers/weather-station.ts
 function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
@@ -226,7 +227,7 @@ function weatherStationMatcher(frame) {
   };
 }
 
-// packages/lib/src/parsers/move-response.ts
+// ../lib/src/parsers/move-response.ts
 function moveResponseMatcher(frame) {
   if (frame.length < 25) return null;
   if (frame[0] !== "r") return null;
@@ -240,7 +241,7 @@ function moveResponseMatcher(frame) {
   };
 }
 
-// packages/lib/src/network/events.ts
+// ../lib/src/network/events.ts
 var TypedEventEmitter = class {
   listeners = /* @__PURE__ */ new Map();
   on(type, fn) {
@@ -265,7 +266,7 @@ var TypedEventEmitter = class {
   }
 };
 
-// packages/lib/src/network/manager.ts
+// ../lib/src/network/manager.ts
 var NetworkManager = class {
   driver;
   parser = new FrameParser();
@@ -275,6 +276,7 @@ var NetworkManager = class {
   devices = /* @__PURE__ */ new Map();
   stickName = "";
   movingTimer = null;
+  lastPositions = /* @__PURE__ */ new Map();
   constructor(driver) {
     this.driver = driver;
   }
@@ -345,7 +347,7 @@ var NetworkManager = class {
     }
     this.parser.reset();
     const unsubData = this.driver.onData((data) => this.onSerialData(data));
-    const unsubError = this.driver.onError((error) => this.emitError(error));
+    const unsubError = this.driver.onError((error2) => this.emitError(error2));
     const unsubClose = this.driver.onClose(() => this.onClose());
     this._state = "configured";
     this.emitter.emit("connected", { stickName: this.stickName });
@@ -361,6 +363,7 @@ var NetworkManager = class {
     });
     this._state = "disconnected";
     this.devices.clear();
+    this.lastPositions.clear();
     this.emitter.emit("disconnected", {});
   }
   scanNetwork(panId) {
@@ -389,11 +392,12 @@ var NetworkManager = class {
         valance1: prev?.valance1 ?? 0,
         valance2: prev?.valance2 ?? 0,
         moving: true,
+        direction: prev !== void 0 && position < prev.position ? "closing" : "opening",
         raw: ""
       };
       this.devices.set(upper, device);
       this.emitter.emit("deviceStatus", { serial: upper, status: device.status });
-      info("MOVE", `${upper} moving=true (from moveToPosition)`);
+      info("MOVE", `${upper} moving=true direction=${device.status.direction} (from moveToPosition)`);
     }
     this.startMovingPoll();
     this.queryStatus(upper);
@@ -403,7 +407,7 @@ var NetworkManager = class {
     this.sendCommand(`R06${upper}707001`);
     const device = this.devices.get(upper);
     if (device?.status) {
-      device.status = { ...device.status, moving: false };
+      device.status = { ...device.status, moving: false, direction: "stopped" };
       this.devices.set(upper, device);
       this.emitter.emit("deviceStatus", { serial: upper, status: device.status });
       this.stopMovingPoll();
@@ -463,9 +467,22 @@ var NetworkManager = class {
     if (st) {
       const prev = this.devices.get(st.serialNumber)?.status;
       const wouldOverride = !!(prev && !prev.moving && st.moving);
+      const lastPos = this.lastPositions.get(st.serialNumber);
+      if (st.moving && lastPos !== void 0 && Number.isFinite(st.position) && !isNaN(st.position)) {
+        if (st.position < lastPos) {
+          st.direction = "closing";
+        } else if (st.position > lastPos) {
+          st.direction = "opening";
+        }
+      } else {
+        st.direction = "stopped";
+      }
       if (wouldOverride) {
         debug("8011", `${st.serialNumber} override prev=${prev.moving} raw=${st.moving} \u2192 false`);
         st.moving = false;
+      }
+      if (Number.isFinite(st.position) && !isNaN(st.position)) {
+        this.lastPositions.set(st.serialNumber, st.position);
       }
       if (!prev || this.hasStatusChanged(prev, st)) {
         const device = this.devices.get(st.serialNumber) ?? {
@@ -506,17 +523,17 @@ var NetworkManager = class {
     }
   }
   hasStatusChanged(a, b) {
-    return a.position !== b.position || a.inclination !== b.inclination || a.moving !== b.moving || a.valance1 !== b.valance1 || a.valance2 !== b.valance2;
+    return a.position !== b.position || a.inclination !== b.inclination || a.moving !== b.moving || a.direction !== b.direction || a.valance1 !== b.valance1 || a.valance2 !== b.valance2;
   }
-  emitError(error) {
-    this.emitter.emit("error", { error });
+  emitError(error2) {
+    this.emitter.emit("error", { error: error2 });
   }
   onClose() {
     this.close();
   }
 };
 
-// packages/web/src/drivers/web-serial.ts
+// src/drivers/web-serial.ts
 var WebSerialDriver = class {
   constructor(port) {
     this.port = port;
@@ -598,7 +615,7 @@ var WebSerialDriver = class {
   }
 };
 
-// packages/web/src/browser.ts
+// src/browser.ts
 function ts() {
   const d = /* @__PURE__ */ new Date();
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") + ":" + String(d.getSeconds()).padStart(2, "0");
@@ -646,7 +663,7 @@ async function startMonitor(port, params, onEvent) {
   return manager;
 }
 
-// packages/web/src/home.tsx
+// src/home.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
 var NAMES_KEY = "wms-device-names";
 var HIDDEN_KEY = "wms-hidden-serials";
