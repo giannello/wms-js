@@ -32,9 +32,13 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      - run: npm run build -w @wms-js/lib
+      - run: |
+          npm run build -w @wms-js/lib
+          npm run build -w @wms-js/cli
+          npm run build -w @wms-js/mqtt-bridge
       - name: Prepare dist for publish
         run: |
+          # @wms-js/lib — library with exports/types
           node -e "
             const pkg = require('./packages/lib/package.json');
             pkg.main = 'index.js';
@@ -51,6 +55,38 @@ jobs:
           "
           cp packages/lib/README.md packages/lib/dist/
           cp packages/lib/LICENSE packages/lib/dist/
+
+          # @wms-js/cli — CLI tool, bin only
+          node -e "
+            const libVer = require('./packages/lib/package.json').version;
+            const pkg = require('./packages/cli/package.json');
+            pkg.bin = { 'wms-js': './index.js' };
+            pkg.dependencies['@wms-js/lib'] = libVer;
+            delete pkg.scripts;
+            delete pkg.devDependencies;
+            delete pkg.publishConfig;
+            delete pkg.files;
+            require('fs').writeFileSync('./packages/cli/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          # @wms-js/mqtt-bridge — CLI tool, bin only
+          node -e "
+            const libVer = require('./packages/lib/package.json').version;
+            const pkg = require('./packages/mqtt-bridge/package.json');
+            pkg.bin = { 'wms-js-mqtt-bridge': './index.js' };
+            pkg.dependencies['@wms-js/lib'] = libVer;
+            delete pkg.scripts;
+            delete pkg.devDependencies;
+            delete pkg.publishConfig;
+            delete pkg.files;
+            require('fs').writeFileSync('./packages/mqtt-bridge/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
       - run: npm publish packages/lib/dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish packages/cli/dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish packages/mqtt-bridge/dist
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

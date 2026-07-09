@@ -1,14 +1,28 @@
 {
   "name": "@wms-js/mqtt-bridge",
+  "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
-  "main": "dist/packages/mqtt-bridge/src/index.js",
-  "types": "dist/packages/mqtt-bridge/src/index.d.ts",
+  "bin": {
+    "wms-js-mqtt-bridge": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "tsc"
   },
   "dependencies": {
     "@wms-js/lib": "*",
     "mqtt": "5.15.1",
     "serialport": "13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.3"
   }
 }

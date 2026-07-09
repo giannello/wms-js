@@ -113,19 +113,24 @@ Broadcast frames are unwrapped (no braces). Full spec in `PROTOCOL.md`.
   stored in local state, set optimistically before the serial write completes.
 - `packages/web/public/home-bundle.js` — esbuild output (28.6kb).
 
-## Publishing `@wms-js/lib` to npm
+## Publishing to npm
 
 ### Automated (CI, recommended)
-Push a version tag to trigger CI publish:
+Push a version tag to trigger CI publish of all 3 packages:
 ```sh
 git checkout main && git pull
 npm version 0.1.0 -w @wms-js/lib   # bumps version, commits, tags v0.1.0
-git push && git push --tags          # CI: tests → build → publish
+npm version 0.1.0 -w @wms-js/cli   # sync CLI version
+npm version 0.1.0 -w @wms-js/mqtt-bridge   # sync bridge version
+git push && git push --tags          # CI: tests → build → publish all
 ```
 
 ### Manual (local, fallback)
 ```sh
-npm run build -w @wms-js/lib
+# Build all
+npm run build -w @wms-js/lib && npm run build -w @wms-js/cli && npm run build -w @wms-js/mqtt-bridge
+
+# @wms-js/lib
 cp packages/lib/README.md packages/lib/dist/
 cp packages/lib/LICENSE packages/lib/dist/
 node -e "
@@ -143,6 +148,33 @@ node -e "
   require('fs').writeFileSync('./packages/lib/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
 "
 npm publish packages/lib/dist --access public
+
+# @wms-js/cli
+libVer=$(node -p "require('./packages/lib/package.json').version")
+node -e "
+  const pkg = require('./packages/cli/package.json');
+  pkg.bin = { 'wms-js': './index.js' };
+  pkg.dependencies['@wms-js/lib'] = '$libVer';
+  delete pkg.scripts;
+  delete pkg.devDependencies;
+  delete pkg.publishConfig;
+  delete pkg.files;
+  require('fs').writeFileSync('./packages/cli/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+npm publish packages/cli/dist --access public
+
+# @wms-js/mqtt-bridge
+node -e "
+  const pkg = require('./packages/mqtt-bridge/package.json');
+  pkg.bin = { 'wms-js-mqtt-bridge': './index.js' };
+  pkg.dependencies['@wms-js/lib'] = '$libVer';
+  delete pkg.scripts;
+  delete pkg.devDependencies;
+  delete pkg.publishConfig;
+  delete pkg.files;
+  require('fs').writeFileSync('./packages/mqtt-bridge/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+npm publish packages/mqtt-bridge/dist --access public
 ```
 
 ### Prerequisites
@@ -151,9 +183,9 @@ npm publish packages/lib/dist --access public
 - `@wms-js` scope on npm (already done)
 
 ## Packages
-| Package | Entry point | Role |
-|---------|-------------|------|
-| `@wms-js/lib` | `packages/lib/src/index.ts` | Core: frame parsing, sessions, controller, commands, broadcast routing |
-| `@wms-js/mqtt-bridge` | `packages/mqtt-bridge/src/index.ts` | MQTT relay (stub — waiting for lib integration) |
-| `@wms-js/web` | `packages/web/src/index.ts` | Web service (stub — waiting for framework) |
-| `@wms-js/cli` | `packages/cli/src/index.ts` | CLI debugger |
+| Package | Entry point | Role | Bin |
+|---------|-------------|------|-----|
+| `@wms-js/lib` | `packages/lib/src/index.ts` | Core: frame parsing, sessions, controller, commands, broadcast routing | — |
+| `@wms-js/cli` | `packages/cli/src/index.ts` | CLI debugger | `wms-js` |
+| `@wms-js/mqtt-bridge` | `packages/mqtt-bridge/src/index.ts` | MQTT bridge | `wms-js-mqtt-bridge` |
+| `@wms-js/web` | `packages/web/src/index.ts` | Web service (stub) | — |
