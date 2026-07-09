@@ -1,5 +1,5 @@
 const DEVICE_TYPE_NAMES: Record<string, string> = {
-  "25": "Awning",
+  "25": "Shade",
 }
 
 export function getDeviceTypeName(code: string): string {

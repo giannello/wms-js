@@ -29,13 +29,13 @@ describe("deviceScanResponseMatcher", () => {
     expect(result!.unknown).toBe(UNKNOWN)
   })
 
-  it("maps device type 25 to Awning", () => {
+  it("maps device type 25 to Shade", () => {
     const frame = `rABCDEF7021DEAD25${UNKNOWN}`
     const result = deviceScanResponseMatcher(frame)
 
     expect(result).not.toBeNull()
     expect(result!.deviceType).toBe("25")
-    expect(result!.deviceTypeName).toBe("Awning")
+    expect(result!.deviceTypeName).toBe("Shade")
   })
 
   it("returns null if frame does not start with r", () => {

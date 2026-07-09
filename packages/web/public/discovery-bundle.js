@@ -308,7 +308,7 @@ var RadioController = class {
 
 // packages/lib/src/parsers/device-scan-response.ts
 var DEVICE_TYPE_NAMES = {
-  "25": "Awning"
+  "25": "Shade"
 };
 function getDeviceTypeName(code) {
   return DEVICE_TYPE_NAMES[code] ?? "Unknown";

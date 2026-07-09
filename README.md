@@ -1,6 +1,6 @@
 # warema-wms
 
-Control Warema WMS radio devices (awnings, weather stations) via a USB serial stick.
+Control Warema WMS radio devices (covers, weather stations) via a USB serial stick.
 
 ## Packages
 

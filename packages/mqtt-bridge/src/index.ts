@@ -51,7 +51,7 @@ function main(): void {
       "~": config.mqttTopicPrefix,
       name: null,
       unique_id: `warema_${serial}`,
-      device_class: "awning",
+      device_class: "shade",
       position_closed: 100,
       position_open: 0,
       command_topic: `~/${serial}/command`,

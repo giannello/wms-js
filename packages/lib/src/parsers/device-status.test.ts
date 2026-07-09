@@ -46,13 +46,13 @@ describe("deviceStatusMatcher", () => {
     expect(result!.moving).toBe(false)
   })
 
-  it("maps device type 25 to Awning", () => {
+  it("maps device type 25 to Shade", () => {
     const frame = "rABCDEF80110100002500FFFFFF00"
     const result = deviceStatusMatcher(frame)
 
     expect(result).not.toBeNull()
     expect(result!.deviceType).toBe("25")
-    expect(result!.deviceTypeName).toBe("Awning")
+    expect(result!.deviceTypeName).toBe("Shade")
   })
 
   it("returns null if frame does not start with r", () => {
