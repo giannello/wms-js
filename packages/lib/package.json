@@ -28,6 +28,6 @@
     "prepublishOnly": "tsc"
   },
   "devDependencies": {
-    "@types/node": "25.9.3"
+    "@types/node": "25.9.5"
   }
 }

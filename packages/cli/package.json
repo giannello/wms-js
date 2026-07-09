@@ -27,6 +27,6 @@
     "serialport": "13.0.0"
   },
   "devDependencies": {
-    "@types/node": "25.9.3"
+    "@types/node": "25.9.5"
   }
 }
