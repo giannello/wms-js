@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { RadioController, Commands, weatherStationMatcher, networkParamsMatcher, deviceScanMatcher, waveRequestMatcher, networkJoinMatcher } from "@wms-js/lib"
 import { NodeSerialDriver } from "./node-serial.js"
 

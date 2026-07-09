@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import mqtt from "mqtt"
 import { NetworkManager } from "@wms-js/lib"
 import { info, error, debug } from "@wms-js/lib"
