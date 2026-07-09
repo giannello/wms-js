@@ -207,8 +207,9 @@ function main(): void {
 
   // --- WMS handlers ---
   manager.on("configured", () => {
-    info("WMS", "Network configured")
+    info("WMS", "Network configured — scanning...")
     wmsConfigured = true
+    manager.scanNetwork(config.wmsPanId)
     publishOnlineIfReady()
   })
 
@@ -222,6 +223,10 @@ function main(): void {
   })
 
   manager.on("deviceDiscovered", ({ device }) => {
+    if (config.wmsAllowedSerials && !config.wmsAllowedSerials.includes(device.serialNumber)) {
+      debug("FILT", `${device.serialNumber} filtered out`)
+      return
+    }
     coverDevices.set(device.serialNumber, {
       serial: device.serialNumber,
       deviceTypeName: device.deviceTypeName,

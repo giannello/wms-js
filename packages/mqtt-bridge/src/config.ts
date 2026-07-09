@@ -3,6 +3,7 @@ export interface Config {
   wmsChannel: number
   wmsPanId: string
   wmsKey: string | undefined
+  wmsAllowedSerials: string[] | undefined
   mqttBrokerUrl: string
   mqttUsername: string | undefined
   mqttPassword: string | undefined
@@ -24,11 +25,17 @@ export function loadConfig(): Config {
     process.exit(1)
   }
 
+  const rawSerials = process.env["WMS_ALLOWED_SERIALS"] ?? ""
+  const wmsAllowedSerials = rawSerials
+    ? rawSerials.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+    : undefined
+
   return {
     wmsPort,
     wmsChannel,
     wmsPanId: (process.env["WMS_PAN_ID"] ?? "FFFF").toUpperCase(),
     wmsKey: process.env["WMS_KEY"] || undefined,
+    wmsAllowedSerials,
     mqttBrokerUrl: process.env["MQTT_BROKER_URL"] ?? "mqtt://localhost:1883",
     mqttUsername: process.env["MQTT_USERNAME"] || undefined,
     mqttPassword: process.env["MQTT_PASSWORD"] || undefined,
