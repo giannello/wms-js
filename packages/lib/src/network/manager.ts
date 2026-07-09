@@ -22,6 +22,7 @@ export class NetworkManager {
   private devices = new Map<string, KnownDevice>()
   private stickName = ""
   private movingTimer: ReturnType<typeof setInterval> | null = null
+  private lastPositions = new Map<string, number>()
 
   constructor(driver: SerialDriver) {
     this.driver = driver
@@ -129,6 +130,7 @@ export class NetworkManager {
     await this.driver.close().catch(() => {})
     this._state = "disconnected"
     this.devices.clear()
+    this.lastPositions.clear()
     this.emitter.emit("disconnected", {})
   }
 
@@ -162,11 +164,12 @@ export class NetworkManager {
         valance1: prev?.valance1 ?? 0,
         valance2: prev?.valance2 ?? 0,
         moving: true,
+        direction: prev !== undefined && position < prev.position ? "closing" : "opening",
         raw: "",
       }
       this.devices.set(upper, device)
       this.emitter.emit("deviceStatus", { serial: upper, status: device.status })
-      info("MOVE", `${upper} moving=true (from moveToPosition)`)
+      info("MOVE", `${upper} moving=true direction=${device.status.direction} (from moveToPosition)`)
     }
 
     this.startMovingPoll()
@@ -180,7 +183,7 @@ export class NetworkManager {
     // Always reflect stop immediately — even if we don't think it's moving
     const device = this.devices.get(upper)
     if (device?.status) {
-      device.status = { ...device.status, moving: false }
+      device.status = { ...device.status, moving: false, direction: "stopped" }
       this.devices.set(upper, device)
       this.emitter.emit("deviceStatus", { serial: upper, status: device.status })
       this.stopMovingPoll()
@@ -251,10 +254,27 @@ export class NetworkManager {
       // moveToPosition() or a 7071 with valid pp can re-enter moving.
       const prev = this.devices.get(st.serialNumber)?.status
       const wouldOverride = !!(prev && !prev.moving && st.moving)
+
+      // Derive direction from position change (only when moving=true)
+      const lastPos = this.lastPositions.get(st.serialNumber)
+      if (st.moving && lastPos !== undefined && Number.isFinite(st.position) && !isNaN(st.position)) {
+        if (st.position < lastPos) {
+          st.direction = "closing"
+        } else if (st.position > lastPos) {
+          st.direction = "opening"
+        }
+      } else {
+        st.direction = "stopped"
+      }
+
       if (wouldOverride) {
         debug("8011", `${st.serialNumber} override prev=${prev!.moving} raw=${st.moving} → false`)
         st.moving = false
       }
+      if (Number.isFinite(st.position) && !isNaN(st.position)) {
+        this.lastPositions.set(st.serialNumber, st.position)
+      }
+
       if (!prev || this.hasStatusChanged(prev, st)) {
         const device = this.devices.get(st.serialNumber) ?? {
           serialNumber: st.serialNumber,
@@ -302,6 +322,7 @@ export class NetworkManager {
       a.position !== b.position ||
       a.inclination !== b.inclination ||
       a.moving !== b.moving ||
+      a.direction !== b.direction ||
       a.valance1 !== b.valance1 ||
       a.valance2 !== b.valance2
     )

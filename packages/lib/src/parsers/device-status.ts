@@ -1,5 +1,7 @@
 import { getDeviceTypeName } from "./device-scan-response.js"
 
+export type DeviceDirection = "opening" | "closing" | "stopped"
+
 export interface DeviceStatus {
   serialNumber: string
   deviceType: string
@@ -9,6 +11,7 @@ export interface DeviceStatus {
   valance1: number
   valance2: number
   moving: boolean
+  direction: DeviceDirection
   raw: string
 }
 
@@ -27,6 +30,7 @@ export function deviceStatusMatcher(frame: string): DeviceStatus | null {
     valance1: parseInt(frame.slice(23, 25), 16),
     valance2: parseInt(frame.slice(25, 27), 16),
     moving: frame.slice(27, 29) === "01",
+    direction: "stopped",
     raw: frame,
   }
 }

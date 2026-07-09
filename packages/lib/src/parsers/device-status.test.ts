@@ -15,6 +15,7 @@ describe("deviceStatusMatcher", () => {
     expect(result!.valance1).toBe(255)
     expect(result!.valance2).toBe(255)
     expect(result!.moving).toBe(false)
+    expect(result!.direction).toBe("stopped")
     expect(result!.raw).toBe(frame)
   })
 

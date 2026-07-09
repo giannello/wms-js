@@ -187,6 +187,79 @@ describe("NetworkManager", () => {
       await manager.close()
     })
 
+    it("tracks direction from position changes", async () => {
+      const manager = await openManager()
+      const events: { serial: string; status: { direction: string; position: number; moving: boolean } }[] = []
+      manager.on("deviceStatus", (e) => events.push(e))
+
+      // Discover device first
+      driver.simulateData(
+        enc("{rA1B2C37021FFFF25" + "0".repeat(40) + "}"),
+      )
+      await tick()
+
+      // Initial status at position 80, stopped
+      driver.simulateData(
+        enc("{rA1B2C3801100000025A07F000000}"),
+      )
+      await tick()
+      expect(events[0].status.direction).toBe("stopped")
+      expect(events[0].status.position).toBe(80)
+
+      // Put device in moving state via moveToPosition (target < current → closing)
+      events.length = 0
+      manager.moveToPosition("A1B2C3", 0)
+      await tick()
+      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.moving).toBe(true)
+
+      // 8011 confirms position 40, still moving → direction "closing"
+      events.length = 0
+      driver.simulateData(
+        enc("{rA1B2C3801100000025507F000001}"),
+      )
+      await tick()
+      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.position).toBe(40)
+      expect(events[0].status.moving).toBe(true)
+
+      // Position drops to 10, still moving → still "closing"
+      events.length = 0
+      driver.simulateData(
+        enc("{rA1B2C3801100000025147F000001}"),
+      )
+      await tick()
+      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.position).toBe(10)
+
+      // Reaches 0, stopped → direction "stopped"
+      events.length = 0
+      driver.simulateData(
+        enc("{rA1B2C3801100000025007F000000}"),
+      )
+      await tick()
+      expect(events[0].status.direction).toBe("stopped")
+      expect(events[0].status.position).toBe(0)
+      expect(events[0].status.moving).toBe(false)
+
+      // Move down via moveToPosition (target > current → opening)
+      events.length = 0
+      manager.moveToPosition("A1B2C3", 100)
+      await tick()
+      expect(events[0].status.direction).toBe("opening")
+
+      // 8011 confirms position 30, still moving → direction "opening"
+      events.length = 0
+      driver.simulateData(
+        enc("{rA1B2C38011000000253C7F000001}"),
+      )
+      await tick()
+      expect(events[0].status.direction).toBe("opening")
+      expect(events[0].status.position).toBe(30)
+
+      await manager.close()
+    })
+
   })
 
   describe("fire-and-forget operations", () => {

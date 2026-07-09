@@ -4,6 +4,12 @@ import { info, error, debug } from "@warema/lib"
 import { loadConfig, type Config } from "./config.js"
 import { NodeSerialDriver } from "./driver.js"
 
+function flipDirection(dir: string): string {
+  if (dir === "opening") return "closing"
+  if (dir === "closing") return "opening"
+  return "stopped"
+}
+
 function main(): void {
   const config = loadConfig()
 
@@ -29,14 +35,6 @@ function main(): void {
   const coverDevices = new Map<string, { serial: string; deviceTypeName: string }>()
   const allWsSerials = new Set<string>()
   const wsDiscoverySent = new Set<string>()
-  const lastPositions = new Map<string, number>()
-
-  function deriveState(serial: string, moving: boolean, position: number): string {
-    if (!moving) return "stopped"
-    const prev = lastPositions.get(serial)
-    if (prev !== undefined && position < prev) return "closing"
-    return "opening"
-  }
 
   function publishOnlineIfReady(): void {
     if (mqttConnected && wmsConfigured) {
@@ -52,12 +50,11 @@ function main(): void {
       name: null,
       unique_id: `warema_${serial}`,
       device_class: "shade",
-      position_closed: 100,
-      position_open: 0,
       command_topic: `~/${serial}/command`,
       state_topic: `~/${serial}/status`,
-      value_template: "{% if value_json.moving %}opening{% else %}stopped{% endif %}",
+      value_template: "{{ value_json.direction }}",
       state_opening: "opening",
+      state_closing: "closing",
       state_stopped: "stopped",
       position_topic: `~/${serial}/status`,
       position_template: "{{ value_json.position }}",
@@ -75,7 +72,7 @@ function main(): void {
         identifiers: [`warema_${serial}`],
         name: `${deviceTypeName}`,
         manufacturer: "Warema",
-        model: deviceTypeName,
+        model: "WMS Plug receiver",
         serial_number: serial,
       },
     })
@@ -104,7 +101,7 @@ function main(): void {
         identifiers: [`warema_ws_${serial}`],
         name: "Weather Station",
         manufacturer: "Warema",
-        model: "Weather Station",
+        model: "WMS Weather station",
         serial_number: serial,
       },
     })
@@ -198,8 +195,9 @@ function main(): void {
         debug("CMD", `${serial} invalid set_position: ${payload}`)
         return
       }
-      info("CMD", `${serial} → set_position ${pos}`)
-      manager.moveToPosition(serial, pos)
+      const wmsPos = 100 - pos
+      info("CMD", `${serial} → set_position ${wmsPos} (HA ${pos})`)
+      manager.moveToPosition(serial, wmsPos)
     }
   })
 
@@ -233,20 +231,17 @@ function main(): void {
   })
 
   manager.on("deviceStatus", ({ serial, status }) => {
-    if (Number.isFinite(status.position) && !isNaN(status.position)) {
-      lastPositions.set(serial, status.position)
-    }
-    const state = deriveState(serial, status.moving, status.position)
     const payload = JSON.stringify({
-      position: status.position,
+      position: status.position !== undefined ? 100 - status.position : undefined,
       moving: status.moving,
       inclination: status.inclination,
+      direction: flipDirection(status.direction),
     })
     mqttClient.publish(`${config.mqttTopicPrefix}/${serial}/status`, payload, {
       qos: 0,
       retain: true,
     })
-    debug("STAT", `${serial} → ${payload}  state=${state}`)
+    debug("STAT", `${serial} → ${payload}`)
   })
 
   manager.on("weatherStation", ({ serial, windSpeed }) => {
