@@ -665,6 +665,7 @@ async function startMonitor(port, params, onEvent) {
 
 // src/home.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
+var NETWORK_PARAMS_KEY = "wms-network-params";
 var NAMES_KEY = "wms-device-names";
 var HIDDEN_KEY = "wms-hidden-serials";
 var LOG_LEVEL_KEY = "wms-log-level";
@@ -704,6 +705,13 @@ function App() {
   const managerRef = React.useRef(null);
   const [connectionState, setConnectionState] = React.useState("connect");
   const [connectionError, setConnectionError] = React.useState("");
+  const hasNetworkParams = (() => {
+    try {
+      return !!localStorage.getItem(NETWORK_PARAMS_KEY);
+    } catch {
+      return false;
+    }
+  })();
   const [stations, setStations] = React.useState(/* @__PURE__ */ new Map());
   const [deviceNames, setDeviceNames] = React.useState(loadNames);
   const [hiddenSerials, setHiddenSerials] = React.useState(loadHidden);
@@ -828,7 +836,7 @@ function App() {
   };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
-    connectionState === "connect" && /* @__PURE__ */ jsx(
+    connectionState === "connect" && hasNetworkParams && /* @__PURE__ */ jsx(
       "button",
       {
         onClick: handleConnect,
@@ -836,6 +844,13 @@ function App() {
         children: "Connect USB Stick"
       }
     ),
+    connectionState === "connect" && !hasNetworkParams && /* @__PURE__ */ jsxs("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: [
+      "No network parameters found. Go to",
+      " ",
+      /* @__PURE__ */ jsx("a", { href: "/discovery.html", className: "underline text-emerald-400", children: "the discovery page" }),
+      " ",
+      "to discover them first."
+    ] }),
     connectionState === "connecting" && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-gray-400", children: [
       /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-emerald-400 rounded-full animate-pulse" }),
       "Configuring network..."

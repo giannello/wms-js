@@ -4,6 +4,7 @@ import { startMonitor, type DiscoveryEvent } from "./browser.js"
 import type { NetworkManager, KnownDevice, LogLevel } from "@wms-js/lib"
 import { setLogLevel, LogLevel as LV } from "@wms-js/lib"
 
+const NETWORK_PARAMS_KEY = "wms-network-params"
 const NAMES_KEY = "wms-device-names"
 const HIDDEN_KEY = "wms-hidden-serials"
 const LOG_LEVEL_KEY = "wms-log-level"
@@ -52,6 +53,14 @@ function App() {
     "connect" | "connecting" | "monitoring" | "error"
   >("connect")
   const [connectionError, setConnectionError] = React.useState("")
+
+  const hasNetworkParams = (() => {
+    try {
+      return !!localStorage.getItem(NETWORK_PARAMS_KEY)
+    } catch {
+      return false
+    }
+  })()
   const [stations, setStations] = React.useState<Map<string, WeatherStationEvent>>(new Map())
   const [deviceNames, setDeviceNames] = React.useState<Record<string, string>>(loadNames)
   const [hiddenSerials, setHiddenSerials] = React.useState<Set<string>>(loadHidden)
@@ -195,13 +204,23 @@ function App() {
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <h1 className="text-2xl font-bold text-emerald-400">WMS Network Monitor</h1>
 
-      {connectionState === "connect" && (
+      {connectionState === "connect" && hasNetworkParams && (
         <button
           onClick={handleConnect}
           className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors"
         >
           Connect USB Stick
         </button>
+      )}
+
+      {connectionState === "connect" && !hasNetworkParams && (
+        <div className="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">
+          No network parameters found. Go to{" "}
+          <a href="/discovery.html" className="underline text-emerald-400">
+            the discovery page
+          </a>{" "}
+          to discover them first.
+        </div>
       )}
 
       {connectionState === "connecting" && (
