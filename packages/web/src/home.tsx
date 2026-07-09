@@ -45,7 +45,7 @@ function saveHidden(hidden: Set<string>) {
   localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]))
 }
 
-type WeatherStationEvent = { serialNumber: string; windSpeed: number }
+type WeatherStationEvent = { serialNumber: string; windSpeed: number; temperature: number | null; rain: boolean; illuminance: number | null }
 
 function App() {
   const managerRef = React.useRef<NetworkManager | null>(null)
@@ -106,6 +106,9 @@ function App() {
             next.set(serial, {
               serialNumber: serial,
               windSpeed: evt.windSpeed as number,
+              temperature: evt.temperature as number | null,
+              rain: evt.rain as boolean,
+              illuminance: evt.illuminance as number | null,
             })
             return next
           })
@@ -202,7 +205,47 @@ function App() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <h1 className="text-2xl font-bold text-emerald-400">WMS Network Monitor</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-emerald-400">WMS Network Monitor</h1>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>Log level:</span>
+            <select
+              value={
+                logLevel === LV.DEBUG ? "debug"
+                : logLevel === LV.INFO ? "info"
+                : logLevel === LV.WARN ? "warn"
+                : logLevel === LV.ERROR ? "error"
+                : "silent"
+              }
+              onChange={(e) => {
+                const v = e.target.value
+                const level = v === "debug" ? LV.DEBUG : v === "info" ? LV.INFO : v === "warn" ? LV.WARN : v === "error" ? LV.ERROR : LV.SILENT
+                localStorage.setItem(LOG_LEVEL_KEY, v)
+                setLogLevelState(level)
+              }}
+              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500"
+            >
+              <option value="debug">Debug</option>
+              <option value="info">Info</option>
+              <option value="warn">Warn</option>
+              <option value="error">Error</option>
+              <option value="silent">Silent</option>
+            </select>
+          </div>
+          {hiddenSerials.size > 0 && (
+            <button
+              onClick={() => {
+                setHiddenSerials(new Set())
+                localStorage.removeItem(HIDDEN_KEY)
+              }}
+              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              Restore {hiddenSerials.size} hidden device{hiddenSerials.size > 1 ? "s" : ""}
+            </button>
+          )}
+        </div>
+      </div>
 
       {connectionState === "connect" && hasNetworkParams && (
         <button
@@ -237,46 +280,8 @@ function App() {
         />
       )}
 
-      {connectionState === "monitoring" && stations.size === 0 && (
-        <div className="text-gray-500">Waiting for weather station broadcasts...</div>
-      )}
-
-      {connectionState === "monitoring" && [...stations.values()].map((s) => (
-        <div key={s.serialNumber} className="bg-gray-900 border border-emerald-700 rounded-lg p-4">
-          <div className="text-gray-400 text-xs uppercase tracking-wide">Serial</div>
-          <div className="text-white font-semibold mt-1">{s.serialNumber}</div>
-          <div className="text-gray-400 text-xs uppercase tracking-wide mt-3">Wind Speed</div>
-          <div className="text-emerald-400 font-bold text-2xl mt-1">{s.windSpeed} km/h</div>
-        </div>
-      ))}
-
       {connectionState === "monitoring" && (
         <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>Log level:</span>
-            <select
-              value={
-                logLevel === LV.DEBUG ? "debug"
-                : logLevel === LV.INFO ? "info"
-                : logLevel === LV.WARN ? "warn"
-                : logLevel === LV.ERROR ? "error"
-                : "silent"
-              }
-              onChange={(e) => {
-                const v = e.target.value
-                const level = v === "debug" ? LV.DEBUG : v === "info" ? LV.INFO : v === "warn" ? LV.WARN : v === "error" ? LV.ERROR : LV.SILENT
-                localStorage.setItem(LOG_LEVEL_KEY, v)
-                setLogLevelState(level)
-              }}
-              className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500"
-            >
-              <option value="debug">Debug</option>
-              <option value="info">Info</option>
-              <option value="warn">Warn</option>
-              <option value="error">Error</option>
-              <option value="silent">Silent</option>
-            </select>
-          </div>
           <button
             onClick={handleScan}
             disabled={scanning}
@@ -298,110 +303,140 @@ function App() {
             </button>
           )}
 
-          {hiddenSerials.size > 0 && (
-            <button
-              onClick={() => {
-                setHiddenSerials(new Set())
-                localStorage.removeItem(HIDDEN_KEY)
-              }}
-              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
-            >
-              Restore {hiddenSerials.size} hidden device{hiddenSerials.size > 1 ? "s" : ""}
-            </button>
-          )}
-
-          {visibleDevices.map((d) => {
-            const ds = d.status
-            const name = deviceNames[d.serialNumber] || ""
-            return (
-              <div key={d.serialNumber} className="bg-gray-900 border border-violet-700 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => handleNameChange(d.serialNumber, e.target.value)}
-                    placeholder="Name this device"
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
-                  />
-                  <button
-                    onClick={() => handleQueryStatus(d.serialNumber)}
-                    className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs font-semibold transition-colors shrink-0"
-                  >
-                    Status
-                  </button>
-                  <button
-                    onClick={() => handleWaveDevice(d.serialNumber)}
-                    className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors shrink-0"
-                  >
-                    Wave
-                  </button>
-                  <button
-                    onClick={() => handleDeleteDevice(d.serialNumber)}
-                    className="px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0"
-                    title="Remove device"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                  <span>{d.serialNumber}</span>
-                  <span>·</span>
-                  <span className="text-violet-400 font-semibold">{d.deviceTypeName}</span>
-                </div>
-                {(() => {
-                  const wm = waveMessages.get(d.serialNumber)
-                  if (!wm) return null
-                  const ok = !wm.startsWith("Wave failed")
-                  return (
-                    <div className={`mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`}>
-                      {wm}
+          {visibleDevices.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {visibleDevices.map((d) => {
+                const ds = d.status
+                const name = deviceNames[d.serialNumber] || ""
+                return (
+                  <div key={d.serialNumber} className="bg-gray-900 border border-violet-700 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => handleNameChange(d.serialNumber, e.target.value)}
+                        placeholder="Name this device"
+                        className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500"
+                      />
+                      <button
+                        onClick={() => handleQueryStatus(d.serialNumber)}
+                        className="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded text-xs font-semibold transition-colors shrink-0"
+                      >
+                        Status
+                      </button>
+                      <button
+                        onClick={() => handleWaveDevice(d.serialNumber)}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors shrink-0"
+                      >
+                        Wave
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDevice(d.serialNumber)}
+                        className="px-2 py-1.5 bg-red-900/50 hover:bg-red-700 text-red-400 hover:text-white rounded text-xs font-semibold transition-colors shrink-0"
+                        title="Remove device"
+                      >
+                        ×
+                      </button>
                     </div>
-                  )
-                })()}
-                {ds && (
-                  <div className="mt-3 pt-3 border-t border-gray-700 space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Position</span>
-                      <span className="text-violet-300 font-semibold">{ds.position}%</span>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                      <span>{d.serialNumber}</span>
+                      <span>·</span>
+                      <span className="text-violet-400 font-semibold">{d.deviceTypeName}</span>
                     </div>
+                    {(() => {
+                      const wm = waveMessages.get(d.serialNumber)
+                      if (!wm) return null
+                      const ok = !wm.startsWith("Wave failed")
+                      return (
+                        <div className={`mt-2 text-xs ${ok ? "text-emerald-400" : "text-red-400"}`}>
+                          {wm}
+                        </div>
+                      )
+                    })()}
+                    {ds && (
+                      <div className="mt-3 pt-3 border-t border-gray-700 space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-400">Position</span>
+                          <span className="text-violet-300 font-semibold">{ds.position}%</span>
+                        </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Moving</span>
                       <span className={ds.moving ? "text-yellow-400 font-semibold" : "text-gray-500"}>
-                        {ds.moving ? "Yes" : "No"}
+                        {ds.moving ? (ds.direction === "opening" ? "▲ Up" : "▼ Down") : "—"}
                       </span>
                     </div>
+                      </div>
+                    )}
+                    {(() => {
+                      const mm = moveMessages.get(d.serialNumber)
+                      if (!mm || !mm.startsWith("Move failed")) return null
+                      return (
+                        <div className="mt-2 text-xs text-red-400">{mm}</div>
+                      )
+                    })()}
+                    <div className="mt-3 pt-3 border-t border-gray-700 flex gap-2">
+                      <button
+                        onClick={() => handleMove(d.serialNumber, "up")}
+                        className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors"
+                      >
+                        ▲ Up
+                      </button>
+                      <button
+                        onClick={() => handleMove(d.serialNumber, "down")}
+                        className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors"
+                      >
+                        ▼ Down
+                      </button>
+                      <button
+                        onClick={() => handleMove(d.serialNumber, "stop")}
+                        className="flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded text-xs font-semibold transition-colors"
+                      >
+                        ■ Stop
+                      </button>
+                    </div>
                   </div>
-                )}
-                {(() => {
-                  const mm = moveMessages.get(d.serialNumber)
-                  if (!mm || !mm.startsWith("Move failed")) return null
-                  return (
-                    <div className="mt-2 text-xs text-red-400">{mm}</div>
-                  )
-                })()}
-                <div className="mt-3 pt-3 border-t border-gray-700 flex gap-2">
-                  <button
-                    onClick={() => handleMove(d.serialNumber, "up")}
-                    className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors"
-                  >
-                    ▲ Up
-                  </button>
-                  <button
-                    onClick={() => handleMove(d.serialNumber, "down")}
-                    className="flex-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs font-semibold transition-colors"
-                  >
-                    ▼ Down
-                  </button>
-                  <button
-                    onClick={() => handleMove(d.serialNumber, "stop")}
-                    className="flex-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded text-xs font-semibold transition-colors"
-                  >
-                    ■ Stop
-                  </button>
-                </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Weather Stations</h2>
+            {stations.size === 0 ? (
+              <div className="text-gray-500 mt-2">Waiting for weather station broadcasts...</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                {[...stations.values()].map((s) => (
+                  <div key={s.serialNumber} className="bg-gray-900 border border-emerald-700 rounded-lg p-4">
+                    <div className="text-gray-400 text-xs uppercase tracking-wide">Serial</div>
+                    <div className="text-white font-semibold mt-1">{s.serialNumber}</div>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div>
+                        <div className="text-gray-400 text-xs uppercase tracking-wide">Wind</div>
+                        <div className="text-emerald-400 font-bold text-xl mt-1">{s.windSpeed} km/h</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400 text-xs uppercase tracking-wide">Temp</div>
+                        <div className="text-white font-semibold text-xl mt-1">
+                          {s.temperature !== null ? `${s.temperature} °C` : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400 text-xs uppercase tracking-wide">Rain</div>
+                        <div className="text-xl mt-1">{s.rain ? "🌧" : "☀️"}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-400 text-xs uppercase tracking-wide">Light</div>
+                        <div className="text-yellow-300 font-semibold text-sm mt-1">
+                          {s.illuminance !== null ? `${s.illuminance.toLocaleString()} lx` : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )
-          })}
+            )}
+          </div>
         </div>
       )}
     </div>

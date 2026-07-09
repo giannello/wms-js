@@ -44,6 +44,9 @@ jobs:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -102,11 +105,5 @@ jobs:
             require('fs').writeFileSync('./packages/mqtt-bridge/dist/package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
       - run: npm publish packages/lib/dist --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm publish packages/cli/dist --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm publish packages/mqtt-bridge/dist --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

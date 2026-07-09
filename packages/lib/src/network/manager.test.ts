@@ -103,7 +103,7 @@ describe("NetworkManager", () => {
         enc("{rABCDEF7080010A000000000000000000000000}"),
       )
 
-      expect(events).toEqual([{ serial: "ABCDEF", windSpeed: 10 }])
+      expect(events).toEqual([{ serial: "ABCDEF", windSpeed: 10, temperature: -35, rain: false, illuminance: 0 }])
       await manager.close()
     })
 
@@ -206,30 +206,30 @@ describe("NetworkManager", () => {
       expect(events[0].status.direction).toBe("stopped")
       expect(events[0].status.position).toBe(80)
 
-      // Put device in moving state via moveToPosition (target < current → closing)
+      // Put device in moving state via moveToPosition (target < current → opening)
       events.length = 0
       manager.moveToPosition("A1B2C3", 0)
       await tick()
-      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.direction).toBe("opening")
       expect(events[0].status.moving).toBe(true)
 
-      // 8011 confirms position 40, still moving → direction "closing"
+      // 8011 confirms position 40, still moving → direction "opening"
       events.length = 0
       driver.simulateData(
         enc("{rA1B2C3801100000025507F000001}"),
       )
       await tick()
-      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.direction).toBe("opening")
       expect(events[0].status.position).toBe(40)
       expect(events[0].status.moving).toBe(true)
 
-      // Position drops to 10, still moving → still "closing"
+      // Position drops to 10, still moving → still "opening"
       events.length = 0
       driver.simulateData(
         enc("{rA1B2C3801100000025147F000001}"),
       )
       await tick()
-      expect(events[0].status.direction).toBe("closing")
+      expect(events[0].status.direction).toBe("opening")
       expect(events[0].status.position).toBe(10)
 
       // Reaches 0, stopped → direction "stopped"
@@ -242,19 +242,19 @@ describe("NetworkManager", () => {
       expect(events[0].status.position).toBe(0)
       expect(events[0].status.moving).toBe(false)
 
-      // Move down via moveToPosition (target > current → opening)
+      // Move down via moveToPosition (target > current → closing)
       events.length = 0
       manager.moveToPosition("A1B2C3", 100)
       await tick()
-      expect(events[0].status.direction).toBe("opening")
+      expect(events[0].status.direction).toBe("closing")
 
-      // 8011 confirms position 30, still moving → direction "opening"
+      // 8011 confirms position 30, still moving → direction "closing"
       events.length = 0
       driver.simulateData(
         enc("{rA1B2C38011000000253C7F000001}"),
       )
       await tick()
-      expect(events[0].status.direction).toBe("opening")
+      expect(events[0].status.direction).toBe("closing")
       expect(events[0].status.position).toBe(30)
 
       await manager.close()

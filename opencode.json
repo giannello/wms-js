@@ -3,6 +3,7 @@
   "plugin": [
     "opencode-browser"
   ],
+  "lsp": true,
   "mcp": {
     "browsermcp": {
       "type": "local",

@@ -120,6 +120,9 @@ export async function startDiscovery(
         timestamp: ts(),
         serialNumber: ws.serialNumber,
         windSpeed: ws.windSpeed,
+        temperature: ws.temperature,
+        rain: ws.rain,
+        illuminance: ws.illuminance,
       })
       onEvent({
         type: "log",
@@ -265,6 +268,9 @@ export async function startMonitor(
       timestamp: ts(),
       serialNumber: e.serial,
       windSpeed: e.windSpeed,
+      temperature: e.temperature,
+      rain: e.rain,
+      illuminance: e.illuminance,
     })
   })
 

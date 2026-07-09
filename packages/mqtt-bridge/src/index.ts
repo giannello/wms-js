@@ -4,12 +4,6 @@ import { info, error, debug } from "@wms-js/lib"
 import { loadConfig, type Config } from "./config.js"
 import { NodeSerialDriver } from "./driver.js"
 
-function flipDirection(dir: string): string {
-  if (dir === "opening") return "closing"
-  if (dir === "closing") return "opening"
-  return "stopped"
-}
-
 function main(): void {
   const config = loadConfig()
 
@@ -81,31 +75,80 @@ function main(): void {
   }
 
   function publishWsDiscovery(serial: string): void {
-    const topic = `${config.mqttDiscoveryPrefix}/sensor/warema_wms_ws_${serial}/config`
-    const payload = JSON.stringify({
+    const dp = config.mqttDiscoveryPrefix
+    const dev = {
+      identifiers: [`warema_wms_ws_${serial}`],
+      name: "Weather Station",
+      manufacturer: "Warema",
+      model: "WMS Weather station",
+      serial_number: serial,
+    }
+    const origin = {
+      name: "wms-js",
+      sw: "0.1.0",
+      url: "https://github.com/giannello/wms-js",
+    }
+
+    // Wind speed
+    mqttClient.publish(`${dp}/sensor/warema_wms_ws_${serial}_wind/config`, JSON.stringify({
       "~": config.mqttTopicPrefix,
       name: "Wind Speed",
-      unique_id: `warema_wms_ws_${serial}`,
+      unique_id: `warema_wms_ws_${serial}_wind`,
       state_topic: `~/weather/${serial}`,
       unit_of_measurement: "km/h",
       value_template: "{{ value_json.wind_speed }}",
       device_class: "wind_speed",
       state_class: "measurement",
       qos: 0,
-      origin: {
-        name: "wms-js",
-        sw: "0.1.0",
-        url: "https://github.com/giannello/wms-js",
-      },
-      device: {
-        identifiers: [`warema_wms_ws_${serial}`],
-        name: "Weather Station",
-        manufacturer: "Warema",
-        model: "WMS Weather station",
-        serial_number: serial,
-      },
-    })
-    mqttClient.publish(topic, payload, { qos: 1, retain: true })
+      origin,
+      device: dev,
+    }), { qos: 1, retain: true })
+
+    // Temperature
+    mqttClient.publish(`${dp}/sensor/warema_wms_ws_${serial}_temp/config`, JSON.stringify({
+      "~": config.mqttTopicPrefix,
+      name: "Temperature",
+      unique_id: `warema_wms_ws_${serial}_temp`,
+      state_topic: `~/weather/${serial}`,
+      unit_of_measurement: "°C",
+      value_template: "{{ value_json.temperature }}",
+      device_class: "temperature",
+      state_class: "measurement",
+      qos: 0,
+      origin,
+      device: dev,
+    }), { qos: 1, retain: true })
+
+    // Illuminance
+    mqttClient.publish(`${dp}/sensor/warema_wms_ws_${serial}_illuminance/config`, JSON.stringify({
+      "~": config.mqttTopicPrefix,
+      name: "Illuminance",
+      unique_id: `warema_wms_ws_${serial}_illuminance`,
+      state_topic: `~/weather/${serial}`,
+      unit_of_measurement: "lx",
+      value_template: "{{ value_json.illuminance }}",
+      device_class: "illuminance",
+      state_class: "measurement",
+      qos: 0,
+      origin,
+      device: dev,
+    }), { qos: 1, retain: true })
+
+    // Rain (binary sensor)
+    mqttClient.publish(`${dp}/binary_sensor/warema_wms_ws_${serial}_rain/config`, JSON.stringify({
+      "~": config.mqttTopicPrefix,
+      name: "Rain",
+      unique_id: `warema_wms_ws_${serial}_rain`,
+      state_topic: `~/weather/${serial}`,
+      payload_on: true,
+      payload_off: false,
+      value_template: "{{ value_json.rain }}",
+      device_class: "moisture",
+      qos: 0,
+      origin,
+      device: dev,
+    }), { qos: 1, retain: true })
+
     info("DISC", `Weather station ${serial}`)
   }
 
@@ -240,7 +283,7 @@ function main(): void {
       position: status.position !== undefined ? 100 - status.position : undefined,
       moving: status.moving,
       inclination: status.inclination,
-      direction: flipDirection(status.direction),
+      direction: status.direction,
     })
     mqttClient.publish(`${config.mqttTopicPrefix}/${serial}/status`, payload, {
       qos: 0,
@@ -249,7 +292,7 @@ function main(): void {
     debug("STAT", `${serial} → ${payload}`)
   })
 
-  manager.on("weatherStation", ({ serial, windSpeed }) => {
+  manager.on("weatherStation", ({ serial, windSpeed, temperature, rain, illuminance }) => {
     allWsSerials.add(serial)
     if (!wsDiscoverySent.has(serial)) {
       wsDiscoverySent.add(serial)
@@ -257,10 +300,10 @@ function main(): void {
     }
     mqttClient.publish(
       `${config.mqttTopicPrefix}/weather/${serial}`,
-      JSON.stringify({ wind_speed: windSpeed }),
+      JSON.stringify({ wind_speed: windSpeed, temperature, rain, illuminance }),
       { qos: 0, retain: true },
     )
-    debug("WTHR", `${serial} wind=${windSpeed} km/h`)
+    debug("WTHR", `${serial} wind=${windSpeed} temp=${temperature} rain=${rain} lux=${illuminance}`)
   })
 
   // --- Open serial ---

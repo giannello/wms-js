@@ -178,9 +178,9 @@ npm publish packages/mqtt-bridge/dist --access public
 ```
 
 ### Prerequisites
-- `npm login` on your machine
-- `NPM_TOKEN` set in GitHub repo secrets (automation token, publish scope)
-- `@wms-js` scope on npm (already done)
+- Trusted publisher configured on npmjs.com for each package (`@wms-js/lib`, `@wms-js/cli`, `@wms-js/mqtt-bridge`):
+  Settings → Trusted Publisher → GitHub Actions → `giannello/wms-js` / `ci.yml` / `npm publish`
+- (No npm token needed — OIDC via `id-token: write` in the workflow)
 
 ## Packages
 | Package | Entry point | Role | Bin |

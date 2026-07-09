@@ -12,6 +12,23 @@ function App() {
   const [result, setResult] = React.useState<DiscoveryEvent | null>(null)
   const [error, setError] = React.useState("")
   const eventsRef = React.useRef<DiscoveryEvent[]>([])
+  const [storedParams, setStoredParams] = React.useState<{
+    panId: string
+    channel: number
+    key: string
+  } | null>(() => {
+    try {
+      const raw = localStorage.getItem("wms-network-params")
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })
+
+  const handleClear = () => {
+    localStorage.removeItem("wms-network-params")
+    setStoredParams(null)
+  }
   const logEndRef = React.useRef<HTMLDivElement | null>(null)
 
   const addEvent = React.useCallback((evt: DiscoveryEvent) => {
@@ -84,105 +101,128 @@ function App() {
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <h1 className="text-2xl font-bold text-emerald-400">WMS Network Parameters Discovery</h1>
 
-      <StepCard number={1} title="Connect the USB stick" status={stepStatus("connect")}>
-        {step === "connect" ? (
-          <button
-            onClick={handleConnect}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors"
-          >
-            Connect USB Stick
-          </button>
-        ) : (
-          <div className="text-emerald-400 flex items-center gap-2">
-            <span>✓</span>
-            <span>Stick connected</span>
-          </div>
-        )}
-      </StepCard>
-
-      {stepStatus("paired") !== "pending" && (
-        <StepCard number={2} title="Enable discovery mode on the remote" status={stepStatus("paired")}>
-          {step === "paired" ? (
-            <div className="space-y-2">
-              <p>Long-press the <strong>L</strong> button on your remote until the LED blinks.</p>
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                Listening for remote...
-              </div>
-            </div>
-          ) : (
-            <div className="text-emerald-400 flex items-center gap-2">
-              <span>✓</span>
-              <span>Remote detected</span>
-            </div>
-          )}
-        </StepCard>
-      )}
-
-      {stepStatus("press-a") !== "pending" && (
-        <StepCard number={3} title="Connect the remote to the USB stick" status={stepStatus("press-a")}>
-          {step === "press-a" ? (
-            <div className="space-y-2">
-              <p>Wait for the <strong>wifi</strong> LED on your remote to turn solid red, then press the <strong>A</strong> button.</p>
-              <div className="bg-gray-800 rounded p-3 text-sm text-gray-400 border border-gray-700">
-                <strong className="text-yellow-400">Tip:</strong> If nothing happens, press{" "}
-                <strong>C</strong>, wait for the LED to stop blinking, then press{" "}
-                <strong>A</strong> again. Repeat until the next step appears.
-              </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
-                Waiting for wave request...
-              </div>
-            </div>
-          ) : (
-            <div className="text-emerald-400 flex items-center gap-2">
-              <span>✓</span>
-              <span>Wave request received</span>
-            </div>
-          )}
-        </StepCard>
-      )}
-
-      {stepStatus("press-stop") !== "pending" && (
-        <StepCard number={4} title="Extract network parameters" status={stepStatus("press-stop")}>
-          {step === "press-stop" ? (
-            <div className="space-y-2">
-              <p>Press the <strong>STOP</strong> button on your remote.</p>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
-                Waiting for key exchange...
-              </div>
-            </div>
-          ) : (
-            <div className="text-emerald-400 flex items-center gap-2">
-              <span>✓</span>
-              <span>Pairing complete</span>
-            </div>
-          )}
-        </StepCard>
-      )}
-
-      {result && (
-        <div className="border-2 border-yellow-500 rounded-lg p-4 bg-yellow-500/10 space-y-3">
-          <div className="text-yellow-400 font-bold text-lg">Network Parameters Discovered!</div>
+      {storedParams ? (
+        <div className="border-2 border-emerald-500 rounded-lg p-4 bg-emerald-500/10 space-y-3">
+          <div className="text-emerald-400 font-bold text-lg">Network Parameters Configured</div>
           <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <span className="text-gray-400">PAN ID:</span>
-            <span className="font-semibold">{result.panId as string}</span>
+            <span className="font-semibold">{storedParams.panId}</span>
             <span className="text-gray-400">Channel:</span>
-            <span className="font-semibold">{result.channel as number}</span>
+            <span className="font-semibold">{storedParams.channel}</span>
             <span className="text-gray-400">Key:</span>
-            <span className="font-mono text-yellow-300 break-all">{result.key as string}</span>
+            <span className="font-mono text-emerald-300 break-all">{storedParams.key}</span>
           </div>
-          <div className="bg-emerald-900/40 border border-emerald-700 rounded p-3 text-sm text-emerald-300">
-            Short-press the <strong>L</strong> button on your remote to return it to normal operation.
+          <button onClick={handleClear}
+            className="px-4 py-3 bg-red-700 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors">
+            Clear and restart discovery
+          </button>
+          <div className="bg-gray-800/60 border border-gray-700 rounded p-3 text-sm text-gray-400">
+            Go back to the <a href="/" className="text-emerald-400 hover:text-emerald-300 underline">home page</a> to use these settings.
           </div>
         </div>
-      )}
+      ) : (
+        <>
+          <StepCard number={1} title="Connect the USB stick" status={stepStatus("connect")}>
+            {step === "connect" ? (
+              <button
+                onClick={handleConnect}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors"
+              >
+                Connect USB Stick
+              </button>
+            ) : (
+              <div className="text-emerald-400 flex items-center gap-2">
+                <span>✓</span>
+                <span>Stick connected</span>
+              </div>
+            )}
+          </StepCard>
 
-      {error && step !== "complete" && (
-        <div className="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">
-          {error}
-        </div>
+          {stepStatus("paired") !== "pending" && (
+            <StepCard number={2} title="Enable discovery mode on the remote" status={stepStatus("paired")}>
+              {step === "paired" ? (
+                <div className="space-y-2">
+                  <p>Long-press the <strong>L</strong> button on your remote until the LED blinks.</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Listening for remote...
+                  </div>
+                </div>
+              ) : (
+                <div className="text-emerald-400 flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Remote detected</span>
+                </div>
+              )}
+            </StepCard>
+          )}
+
+          {stepStatus("press-a") !== "pending" && (
+            <StepCard number={3} title="Connect the remote to the USB stick" status={stepStatus("press-a")}>
+              {step === "press-a" ? (
+                <div className="space-y-2">
+                  <p>Wait for the <strong>wifi</strong> LED on your remote to turn solid red, then press the <strong>A</strong> button.</p>
+                  <div className="bg-gray-800 rounded p-3 text-sm text-gray-400 border border-gray-700">
+                    <strong className="text-yellow-400">Tip:</strong> If nothing happens, press{" "}
+                    <strong>C</strong>, wait for the LED to stop blinking, then press{" "}
+                    <strong>A</strong> again. Repeat until the next step appears.
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                    Waiting for wave request...
+                  </div>
+                </div>
+              ) : (
+                <div className="text-emerald-400 flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Wave request received</span>
+                </div>
+              )}
+            </StepCard>
+          )}
+
+          {stepStatus("press-stop") !== "pending" && (
+            <StepCard number={4} title="Extract network parameters" status={stepStatus("press-stop")}>
+              {step === "press-stop" ? (
+                <div className="space-y-2">
+                  <p>Press the <strong>STOP</strong> button on your remote.</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                    Waiting for key exchange...
+                  </div>
+                </div>
+              ) : (
+                <div className="text-emerald-400 flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Pairing complete</span>
+                </div>
+              )}
+            </StepCard>
+          )}
+
+          {result && (
+            <div className="border-2 border-yellow-500 rounded-lg p-4 bg-yellow-500/10 space-y-3">
+              <div className="text-yellow-400 font-bold text-lg">Network Parameters Discovered!</div>
+              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                <span className="text-gray-400">PAN ID:</span>
+                <span className="font-semibold">{result.panId as string}</span>
+                <span className="text-gray-400">Channel:</span>
+                <span className="font-semibold">{result.channel as number}</span>
+                <span className="text-gray-400">Key:</span>
+                <span className="font-mono text-yellow-300 break-all">{result.key as string}</span>
+              </div>
+              <div className="bg-emerald-900/40 border border-emerald-700 rounded p-3 text-sm text-emerald-300">
+                Short-press the <strong>L</strong> button on your remote to return it to normal operation.
+              </div>
+            </div>
+          )}
+
+          {error && step !== "complete" && (
+            <div className="bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+        </>
       )}
 
       <details className="text-sm">

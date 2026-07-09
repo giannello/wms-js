@@ -164,7 +164,7 @@ export class NetworkManager {
         valance1: prev?.valance1 ?? 0,
         valance2: prev?.valance2 ?? 0,
         moving: true,
-        direction: prev !== undefined && position < prev.position ? "closing" : "opening",
+        direction: prev !== undefined && position < prev.position ? "opening" : "closing",
         raw: "",
       }
       this.devices.set(upper, device)
@@ -231,6 +231,9 @@ export class NetworkManager {
       this.emitter.emit("weatherStation", {
         serial: ws.serialNumber,
         windSpeed: ws.windSpeed,
+        temperature: ws.temperature,
+        rain: ws.rain,
+        illuminance: ws.illuminance,
       })
       return
     }
@@ -259,9 +262,9 @@ export class NetworkManager {
       const lastPos = this.lastPositions.get(st.serialNumber)
       if (st.moving && lastPos !== undefined && Number.isFinite(st.position) && !isNaN(st.position)) {
         if (st.position < lastPos) {
-          st.direction = "closing"
-        } else if (st.position > lastPos) {
           st.direction = "opening"
+        } else if (st.position > lastPos) {
+          st.direction = "closing"
         }
       } else {
         st.direction = "stopped"

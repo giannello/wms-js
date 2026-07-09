@@ -220,9 +220,23 @@ function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
   if (frame.slice(7, 11) !== "7080") return null;
+  const ww = parseInt(frame.slice(13, 15), 16);
+  const l1 = parseInt(frame.slice(15, 17), 16);
+  const l2 = parseInt(frame.slice(23, 25), 16);
+  const rain = frame.slice(25, 27) === "C8";
+  const tRaw = parseInt(frame.slice(29, 31), 16);
+  const temperature = Number.isFinite(tRaw) ? +(tRaw / 2 - 35).toFixed(1) : null;
+  const illuminance = (() => {
+    if (!Number.isFinite(l1) || !Number.isFinite(l2)) return null;
+    if (l1 === 0) return l2 * 2;
+    return l1 * l2 * 2;
+  })();
   return {
     serialNumber: frame.slice(1, 7),
-    windSpeed: parseInt(frame.slice(13, 15), 16),
+    windSpeed: ww,
+    temperature,
+    rain,
+    illuminance,
     raw: frame
   };
 }
@@ -392,7 +406,7 @@ var NetworkManager = class {
         valance1: prev?.valance1 ?? 0,
         valance2: prev?.valance2 ?? 0,
         moving: true,
-        direction: prev !== void 0 && position < prev.position ? "closing" : "opening",
+        direction: prev !== void 0 && position < prev.position ? "opening" : "closing",
         raw: ""
       };
       this.devices.set(upper, device);
@@ -447,7 +461,10 @@ var NetworkManager = class {
     if (ws) {
       this.emitter.emit("weatherStation", {
         serial: ws.serialNumber,
-        windSpeed: ws.windSpeed
+        windSpeed: ws.windSpeed,
+        temperature: ws.temperature,
+        rain: ws.rain,
+        illuminance: ws.illuminance
       });
       return;
     }
@@ -470,9 +487,9 @@ var NetworkManager = class {
       const lastPos = this.lastPositions.get(st.serialNumber);
       if (st.moving && lastPos !== void 0 && Number.isFinite(st.position) && !isNaN(st.position)) {
         if (st.position < lastPos) {
-          st.direction = "closing";
-        } else if (st.position > lastPos) {
           st.direction = "opening";
+        } else if (st.position > lastPos) {
+          st.direction = "closing";
         }
       } else {
         st.direction = "stopped";
@@ -634,7 +651,10 @@ async function startMonitor(port, params, onEvent) {
       type: "weather-station",
       timestamp: ts(),
       serialNumber: e.serial,
-      windSpeed: e.windSpeed
+      windSpeed: e.windSpeed,
+      temperature: e.temperature,
+      rain: e.rain,
+      illuminance: e.illuminance
     });
   });
   onEvent({ type: "log", timestamp: ts(), message: "Opening serial port..." });
@@ -749,7 +769,10 @@ function App() {
             const next = new Map(prev);
             next.set(serial, {
               serialNumber: serial,
-              windSpeed: evt.windSpeed
+              windSpeed: evt.windSpeed,
+              temperature: evt.temperature,
+              rain: evt.rain,
+              illuminance: evt.illuminance
             });
             return next;
           });
@@ -835,7 +858,50 @@ function App() {
     }
   };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
-    /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Monitor" }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-xs text-gray-500", children: [
+          /* @__PURE__ */ jsx("span", { children: "Log level:" }),
+          /* @__PURE__ */ jsxs(
+            "select",
+            {
+              value: logLevel === LogLevel.DEBUG ? "debug" : logLevel === LogLevel.INFO ? "info" : logLevel === LogLevel.WARN ? "warn" : logLevel === LogLevel.ERROR ? "error" : "silent",
+              onChange: (e) => {
+                const v = e.target.value;
+                const level = v === "debug" ? LogLevel.DEBUG : v === "info" ? LogLevel.INFO : v === "warn" ? LogLevel.WARN : v === "error" ? LogLevel.ERROR : LogLevel.SILENT;
+                localStorage.setItem(LOG_LEVEL_KEY, v);
+                setLogLevelState(level);
+              },
+              className: "bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500",
+              children: [
+                /* @__PURE__ */ jsx("option", { value: "debug", children: "Debug" }),
+                /* @__PURE__ */ jsx("option", { value: "info", children: "Info" }),
+                /* @__PURE__ */ jsx("option", { value: "warn", children: "Warn" }),
+                /* @__PURE__ */ jsx("option", { value: "error", children: "Error" }),
+                /* @__PURE__ */ jsx("option", { value: "silent", children: "Silent" })
+              ]
+            }
+          )
+        ] }),
+        hiddenSerials.size > 0 && /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => {
+              setHiddenSerials(/* @__PURE__ */ new Set());
+              localStorage.removeItem(HIDDEN_KEY);
+            },
+            className: "text-xs text-gray-600 hover:text-gray-400 transition-colors",
+            children: [
+              "Restore ",
+              hiddenSerials.size,
+              " hidden device",
+              hiddenSerials.size > 1 ? "s" : ""
+            ]
+          }
+        )
+      ] })
+    ] }),
     connectionState === "connect" && hasNetworkParams && /* @__PURE__ */ jsx(
       "button",
       {
@@ -862,40 +928,7 @@ function App() {
         dangerouslySetInnerHTML: { __html: connectionError }
       }
     ),
-    connectionState === "monitoring" && stations.size === 0 && /* @__PURE__ */ jsx("div", { className: "text-gray-500", children: "Waiting for weather station broadcasts..." }),
-    connectionState === "monitoring" && [...stations.values()].map((s) => /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-emerald-700 rounded-lg p-4", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
-      /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: s.serialNumber }),
-      /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide mt-3", children: "Wind Speed" }),
-      /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 font-bold text-2xl mt-1", children: [
-        s.windSpeed,
-        " km/h"
-      ] })
-    ] }, s.serialNumber)),
     connectionState === "monitoring" && /* @__PURE__ */ jsxs("div", { className: "space-y-3 pt-2", children: [
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-xs text-gray-500", children: [
-        /* @__PURE__ */ jsx("span", { children: "Log level:" }),
-        /* @__PURE__ */ jsxs(
-          "select",
-          {
-            value: logLevel === LogLevel.DEBUG ? "debug" : logLevel === LogLevel.INFO ? "info" : logLevel === LogLevel.WARN ? "warn" : logLevel === LogLevel.ERROR ? "error" : "silent",
-            onChange: (e) => {
-              const v = e.target.value;
-              const level = v === "debug" ? LogLevel.DEBUG : v === "info" ? LogLevel.INFO : v === "warn" ? LogLevel.WARN : v === "error" ? LogLevel.ERROR : LogLevel.SILENT;
-              localStorage.setItem(LOG_LEVEL_KEY, v);
-              setLogLevelState(level);
-            },
-            className: "bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300 focus:outline-none focus:border-violet-500",
-            children: [
-              /* @__PURE__ */ jsx("option", { value: "debug", children: "Debug" }),
-              /* @__PURE__ */ jsx("option", { value: "info", children: "Info" }),
-              /* @__PURE__ */ jsx("option", { value: "warn", children: "Warn" }),
-              /* @__PURE__ */ jsx("option", { value: "error", children: "Error" }),
-              /* @__PURE__ */ jsx("option", { value: "silent", children: "Silent" })
-            ]
-          }
-        )
-      ] }),
       /* @__PURE__ */ jsx(
         "button",
         {
@@ -914,23 +947,7 @@ function App() {
           children: "Refresh All"
         }
       ),
-      hiddenSerials.size > 0 && /* @__PURE__ */ jsxs(
-        "button",
-        {
-          onClick: () => {
-            setHiddenSerials(/* @__PURE__ */ new Set());
-            localStorage.removeItem(HIDDEN_KEY);
-          },
-          className: "text-xs text-gray-600 hover:text-gray-400 transition-colors",
-          children: [
-            "Restore ",
-            hiddenSerials.size,
-            " hidden device",
-            hiddenSerials.size > 1 ? "s" : ""
-          ]
-        }
-      ),
-      visibleDevices.map((d) => {
+      visibleDevices.length > 0 && /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: visibleDevices.map((d) => {
         const ds = d.status;
         const name = deviceNames[d.serialNumber] || "";
         return /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-violet-700 rounded-lg p-4", children: [
@@ -992,7 +1009,7 @@ function App() {
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "flex justify-between text-sm", children: [
               /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Moving" }),
-              /* @__PURE__ */ jsx("span", { className: ds.moving ? "text-yellow-400 font-semibold" : "text-gray-500", children: ds.moving ? "Yes" : "No" })
+              /* @__PURE__ */ jsx("span", { className: ds.moving ? "text-yellow-400 font-semibold" : "text-gray-500", children: ds.moving ? ds.direction === "opening" ? "\u25B2 Up" : "\u25BC Down" : "\u2014" })
             ] })
           ] }),
           (() => {
@@ -1027,7 +1044,35 @@ function App() {
             )
           ] })
         ] }, d.serialNumber);
-      })
+      }) }),
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-gray-400 uppercase tracking-wide", children: "Weather Stations" }),
+        stations.size === 0 ? /* @__PURE__ */ jsx("div", { className: "text-gray-500 mt-2", children: "Waiting for weather station broadcasts..." }) : /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2", children: [...stations.values()].map((s) => /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 border border-emerald-700 rounded-lg p-4", children: [
+          /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Serial" }),
+          /* @__PURE__ */ jsx("div", { className: "text-white font-semibold mt-1", children: s.serialNumber }),
+          /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-4 mt-3", children: [
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Wind" }),
+              /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 font-bold text-xl mt-1", children: [
+                s.windSpeed,
+                " km/h"
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Temp" }),
+              /* @__PURE__ */ jsx("div", { className: "text-white font-semibold text-xl mt-1", children: s.temperature !== null ? `${s.temperature} \xB0C` : "\u2014" })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Rain" }),
+              /* @__PURE__ */ jsx("div", { className: "text-xl mt-1", children: s.rain ? "\u{1F327}" : "\u2600\uFE0F" })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Light" }),
+              /* @__PURE__ */ jsx("div", { className: "text-yellow-300 font-semibold text-sm mt-1", children: s.illuminance !== null ? `${s.illuminance.toLocaleString()} lx` : "\u2014" })
+            ] })
+          ] })
+        ] }, s.serialNumber)) })
+      ] })
     ] })
   ] });
 }
