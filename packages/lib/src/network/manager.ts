@@ -226,6 +226,7 @@ export class NetworkManager {
   }
 
   private processFrame(frame: string): void {
+    debug("<<", frame)
     const ws = weatherStationMatcher(frame)
     if (ws) {
       this.emitter.emit("weatherStation", {
@@ -234,6 +235,9 @@ export class NetworkManager {
         temperature: ws.temperature,
         rain: ws.rain,
         illuminance: ws.illuminance,
+        battery: ws.battery,
+        temperatureIndoor: ws.temperatureIndoor,
+        humidity: ws.humidity,
       })
       return
     }

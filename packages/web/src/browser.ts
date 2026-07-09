@@ -123,6 +123,9 @@ export async function startDiscovery(
         temperature: ws.temperature,
         rain: ws.rain,
         illuminance: ws.illuminance,
+        battery: ws.battery,
+        temperatureIndoor: ws.temperatureIndoor,
+        humidity: ws.humidity,
       })
       onEvent({
         type: "log",
@@ -271,6 +274,9 @@ export async function startMonitor(
       temperature: e.temperature,
       rain: e.rain,
       illuminance: e.illuminance,
+      battery: e.battery,
+      temperatureIndoor: e.temperatureIndoor,
+      humidity: e.humidity,
     })
   })
 

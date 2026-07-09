@@ -100,10 +100,10 @@ describe("NetworkManager", () => {
       manager.on("weatherStation", (e) => events.push(e))
 
       driver.simulateData(
-        enc("{rABCDEF7080010A000000000000000000000000}"),
+        enc("{rABCDEF7080010A0000000000000000}"),
       )
 
-      expect(events).toEqual([{ serial: "ABCDEF", windSpeed: 10, temperature: -35, rain: false, illuminance: 0 }])
+      expect(events).toEqual([{ serial: "ABCDEF", windSpeed: 5, temperature: -40, rain: false, illuminance: 0, battery: 0, temperatureIndoor: null, humidity: null }])
       await manager.close()
     })
 

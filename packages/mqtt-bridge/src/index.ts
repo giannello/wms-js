@@ -105,21 +105,6 @@ function main(): void {
       device: dev,
     }), { qos: 1, retain: true })
 
-    // Temperature
-    mqttClient.publish(`${dp}/sensor/warema_wms_ws_${serial}_temp/config`, JSON.stringify({
-      "~": config.mqttTopicPrefix,
-      name: "Temperature",
-      unique_id: `warema_wms_ws_${serial}_temp`,
-      state_topic: `~/weather/${serial}`,
-      unit_of_measurement: "°C",
-      value_template: "{{ value_json.temperature }}",
-      device_class: "temperature",
-      state_class: "measurement",
-      qos: 0,
-      origin,
-      device: dev,
-    }), { qos: 1, retain: true })
-
     // Illuminance
     mqttClient.publish(`${dp}/sensor/warema_wms_ws_${serial}_illuminance/config`, JSON.stringify({
       "~": config.mqttTopicPrefix,
@@ -130,21 +115,6 @@ function main(): void {
       value_template: "{{ value_json.illuminance }}",
       device_class: "illuminance",
       state_class: "measurement",
-      qos: 0,
-      origin,
-      device: dev,
-    }), { qos: 1, retain: true })
-
-    // Rain (binary sensor)
-    mqttClient.publish(`${dp}/binary_sensor/warema_wms_ws_${serial}_rain/config`, JSON.stringify({
-      "~": config.mqttTopicPrefix,
-      name: "Rain",
-      unique_id: `warema_wms_ws_${serial}_rain`,
-      state_topic: `~/weather/${serial}`,
-      payload_on: true,
-      payload_off: false,
-      value_template: "{{ value_json.rain }}",
-      device_class: "moisture",
       qos: 0,
       origin,
       device: dev,
@@ -293,7 +263,7 @@ function main(): void {
     debug("STAT", `${serial} → ${payload}`)
   })
 
-  manager.on("weatherStation", ({ serial, windSpeed, temperature, rain, illuminance }) => {
+  manager.on("weatherStation", ({ serial, windSpeed, illuminance }) => {
     allWsSerials.add(serial)
     if (!wsDiscoverySent.has(serial)) {
       wsDiscoverySent.add(serial)
@@ -301,10 +271,10 @@ function main(): void {
     }
     mqttClient.publish(
       `${config.mqttTopicPrefix}/weather/${serial}`,
-      JSON.stringify({ wind_speed: windSpeed, temperature, rain, illuminance }),
+      JSON.stringify({ wind_speed: windSpeed, illuminance }),
       { qos: 0, retain: true },
     )
-    debug("WTHR", `${serial} wind=${windSpeed} temp=${temperature} rain=${rain} lux=${illuminance}`)
+    debug("WTHR", `${serial} wind=${windSpeed} lux=${illuminance}`)
   })
 
   // --- Open serial ---

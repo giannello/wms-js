@@ -221,22 +221,38 @@ function weatherStationMatcher(frame) {
   if (frame[0] !== "r") return null;
   if (frame.slice(7, 11) !== "7080") return null;
   const ww = parseInt(frame.slice(13, 15), 16);
+  const windSpeed = Number.isFinite(ww) ? +(ww / 2).toFixed(1) : 0;
   const l1 = parseInt(frame.slice(15, 17), 16);
   const l2 = parseInt(frame.slice(23, 25), 16);
-  const rain = frame.slice(25, 27) === "C8";
-  const tRaw = parseInt(frame.slice(29, 31), 16);
-  const temperature = Number.isFinite(tRaw) ? +(tRaw / 2 - 35).toFixed(1) : null;
   const illuminance = (() => {
     if (!Number.isFinite(l1) || !Number.isFinite(l2)) return null;
     if (l1 === 0) return l2 * 2;
     return l1 * l2 * 2;
   })();
+  const rain = frame.slice(27, 29) === "C8";
+  const tRaw = parseInt(frame.slice(29, 31), 16);
+  const temperature = Number.isFinite(tRaw) ? +(tRaw / 2 - 40).toFixed(1) : null;
+  const bRaw = parseInt(frame.slice(25, 27), 16);
+  const battery = Number.isFinite(bRaw) ? +(bRaw / 2).toFixed(1) : null;
+  let temperatureIndoor = null;
+  if (frame.length >= 33) {
+    const tiRaw = parseInt(frame.slice(31, 33), 16);
+    temperatureIndoor = Number.isFinite(tiRaw) ? +(tiRaw / 2 - 40).toFixed(1) : null;
+  }
+  let humidity = null;
+  if (frame.length >= 39) {
+    const hRaw = parseInt(frame.slice(37, 39), 16);
+    humidity = Number.isFinite(hRaw) ? +(hRaw / 2).toFixed(1) : null;
+  }
   return {
     serialNumber: frame.slice(1, 7),
-    windSpeed: ww,
+    windSpeed,
     temperature,
     rain,
     illuminance,
+    battery,
+    temperatureIndoor,
+    humidity,
     raw: frame
   };
 }
@@ -457,6 +473,7 @@ var NetworkManager = class {
     }
   }
   processFrame(frame) {
+    debug("<<", frame);
     const ws = weatherStationMatcher(frame);
     if (ws) {
       this.emitter.emit("weatherStation", {
@@ -464,7 +481,10 @@ var NetworkManager = class {
         windSpeed: ws.windSpeed,
         temperature: ws.temperature,
         rain: ws.rain,
-        illuminance: ws.illuminance
+        illuminance: ws.illuminance,
+        battery: ws.battery,
+        temperatureIndoor: ws.temperatureIndoor,
+        humidity: ws.humidity
       });
       return;
     }
@@ -654,7 +674,10 @@ async function startMonitor(port, params, onEvent) {
       windSpeed: e.windSpeed,
       temperature: e.temperature,
       rain: e.rain,
-      illuminance: e.illuminance
+      illuminance: e.illuminance,
+      battery: e.battery,
+      temperatureIndoor: e.temperatureIndoor,
+      humidity: e.humidity
     });
   });
   onEvent({ type: "log", timestamp: ts(), message: "Opening serial port..." });
@@ -772,7 +795,10 @@ function App() {
               windSpeed: evt.windSpeed,
               temperature: evt.temperature,
               rain: evt.rain,
-              illuminance: evt.illuminance
+              illuminance: evt.illuminance,
+              battery: evt.battery,
+              temperatureIndoor: evt.temperatureIndoor,
+              humidity: evt.humidity
             });
             return next;
           });
@@ -1057,14 +1083,6 @@ function App() {
                 s.windSpeed,
                 " km/h"
               ] })
-            ] }),
-            /* @__PURE__ */ jsxs("div", { children: [
-              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Temp" }),
-              /* @__PURE__ */ jsx("div", { className: "text-white font-semibold text-xl mt-1", children: s.temperature !== null ? `${s.temperature} \xB0C` : "\u2014" })
-            ] }),
-            /* @__PURE__ */ jsxs("div", { children: [
-              /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Rain" }),
-              /* @__PURE__ */ jsx("div", { className: "text-xl mt-1", children: s.rain ? "\u{1F327}" : "\u2600\uFE0F" })
             ] }),
             /* @__PURE__ */ jsxs("div", { children: [
               /* @__PURE__ */ jsx("div", { className: "text-gray-400 text-xs uppercase tracking-wide", children: "Light" }),

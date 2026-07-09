@@ -45,7 +45,7 @@ function saveHidden(hidden: Set<string>) {
   localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]))
 }
 
-type WeatherStationEvent = { serialNumber: string; windSpeed: number; temperature: number | null; rain: boolean; illuminance: number | null }
+type WeatherStationEvent = { serialNumber: string; windSpeed: number; temperature: number | null; rain: boolean; illuminance: number | null; battery: number | null; temperatureIndoor: number | null; humidity: number | null }
 
 function App() {
   const managerRef = React.useRef<NetworkManager | null>(null)
@@ -109,6 +109,9 @@ function App() {
               temperature: evt.temperature as number | null,
               rain: evt.rain as boolean,
               illuminance: evt.illuminance as number | null,
+              battery: evt.battery as number | null,
+              temperatureIndoor: evt.temperatureIndoor as number | null,
+              humidity: evt.humidity as number | null,
             })
             return next
           })
@@ -414,16 +417,6 @@ function App() {
                       <div>
                         <div className="text-gray-400 text-xs uppercase tracking-wide">Wind</div>
                         <div className="text-emerald-400 font-bold text-xl mt-1">{s.windSpeed} km/h</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400 text-xs uppercase tracking-wide">Temp</div>
-                        <div className="text-white font-semibold text-xl mt-1">
-                          {s.temperature !== null ? `${s.temperature} °C` : "—"}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-gray-400 text-xs uppercase tracking-wide">Rain</div>
-                        <div className="text-xl mt-1">{s.rain ? "🌧" : "☀️"}</div>
                       </div>
                       <div>
                         <div className="text-gray-400 text-xs uppercase tracking-wide">Light</div>

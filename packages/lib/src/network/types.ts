@@ -16,7 +16,7 @@ export interface NetworkEventMap {
   disconnected: {}
   configured: {}
   error: { error: Error }
-  weatherStation: { serial: string; windSpeed: number; temperature: number | null; rain: boolean; illuminance: number | null }
+  weatherStation: { serial: string; windSpeed: number; temperature: number | null; rain: boolean; illuminance: number | null; battery: number | null; temperatureIndoor: number | null; humidity: number | null }
   deviceDiscovered: { device: DeviceScanResponse }
   deviceStatus: { serial: string; status: DeviceStatus }
   waveResult: { serial: string; code?: string }
