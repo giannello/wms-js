@@ -24,6 +24,11 @@ function App() {
       return null
     }
   })
+  const [mode, setMode] = React.useState<"auto" | "manual">("auto")
+  const [manualChannel, setManualChannel] = React.useState("")
+  const [manualPanId, setManualPanId] = React.useState("")
+  const [manualKey, setManualKey] = React.useState("")
+  const [manualError, setManualError] = React.useState("")
 
   const handleClear = () => {
     localStorage.removeItem("wms-network-params")
@@ -122,6 +127,91 @@ function App() {
         </div>
       ) : (
         <>
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => { setMode("auto"); setManualError("") }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === "auto" ? "bg-emerald-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}
+            >
+              Auto-discovery
+            </button>
+            <button
+              onClick={() => { setMode("manual"); setManualError("") }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === "manual" ? "bg-emerald-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}
+            >
+              Manual config
+            </button>
+          </div>
+
+          {mode === "manual" && (
+            <div className="border-2 border-emerald-500 rounded-lg p-4 bg-gray-900 space-y-3">
+              <div className="text-emerald-400 font-bold text-lg">Manual Network Configuration</div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-gray-400 text-sm block mb-1">Channel (11-26)</label>
+                  <input
+                    type="number" min={11} max={26}
+                    value={manualChannel}
+                    onChange={(e) => setManualChannel(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm block mb-1">PAN ID (hex, e.g. FFFF)</label>
+                  <input
+                    type="text"
+                    value={manualPanId}
+                    onChange={(e) => setManualPanId(e.target.value.toUpperCase())}
+                    placeholder="FFFF"
+                    maxLength={4}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-gray-400 text-sm block mb-1">Key (optional, 32 hex chars)</label>
+                  <input
+                    type="text"
+                    value={manualKey}
+                    onChange={(e) => setManualKey(e.target.value.toUpperCase())}
+                    placeholder="(leave blank for no encryption)"
+                    maxLength={32}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                {manualError && (
+                  <div className="text-red-400 text-sm">{manualError}</div>
+                )}
+                <button
+                  onClick={() => {
+                    const ch = parseInt(manualChannel, 10)
+                    if (!/^[0-9A-F]{1,4}$/.test(manualPanId)) {
+                      setManualError("PAN ID must be 1-4 hex characters")
+                      return
+                    }
+                    if (isNaN(ch) || ch < 11 || ch > 26) {
+                      setManualError("Channel must be between 11 and 26")
+                      return
+                    }
+                    if (manualKey && !/^[0-9A-F]{32}$/.test(manualKey)) {
+                      setManualError("Key must be exactly 32 hex characters or left empty")
+                      return
+                    }
+                    setManualError("")
+                    const params = { panId: manualPanId, channel: ch, key: manualKey }
+                    try {
+                      localStorage.setItem("wms-network-params", JSON.stringify(params))
+                    } catch { /* localStorage unavailable or full */ }
+                    setStoredParams(params)
+                  }}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors"
+                >
+                  Save Configuration
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === "auto" && (
+          <>
           <StepCard number={1} title="Connect the USB stick" status={stepStatus("connect")}>
             {step === "connect" ? (
               <button
@@ -250,6 +340,8 @@ function App() {
           <div ref={logEndRef} />
         </div>
       </details>
+      </>
+    )}
     </div>
   )
 }
