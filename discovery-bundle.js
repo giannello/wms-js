@@ -627,9 +627,23 @@ function weatherStationMatcher(frame) {
   if (frame.length < 31) return null;
   if (frame[0] !== "r") return null;
   if (frame.slice(7, 11) !== "7080") return null;
+  const ww = parseInt(frame.slice(13, 15), 16);
+  const l1 = parseInt(frame.slice(15, 17), 16);
+  const l2 = parseInt(frame.slice(23, 25), 16);
+  const rain = frame.slice(25, 27) === "C8";
+  const tRaw = parseInt(frame.slice(29, 31), 16);
+  const temperature = Number.isFinite(tRaw) ? +(tRaw / 2 - 35).toFixed(1) : null;
+  const illuminance = (() => {
+    if (!Number.isFinite(l1) || !Number.isFinite(l2)) return null;
+    if (l1 === 0) return l2 * 2;
+    return l1 * l2 * 2;
+  })();
   return {
     serialNumber: frame.slice(1, 7),
-    windSpeed: parseInt(frame.slice(13, 15), 16),
+    windSpeed: ww,
+    temperature,
+    rain,
+    illuminance,
     raw: frame
   };
 }
@@ -843,7 +857,10 @@ async function startDiscovery(port, onEvent) {
         type: "weather-station",
         timestamp: ts(),
         serialNumber: ws.serialNumber,
-        windSpeed: ws.windSpeed
+        windSpeed: ws.windSpeed,
+        temperature: ws.temperature,
+        rain: ws.rain,
+        illuminance: ws.illuminance
       });
       onEvent({
         type: "log",
@@ -958,7 +975,7 @@ async function startDiscovery(port, onEvent) {
 }
 
 // src/ui.tsx
-import { jsx, jsxs } from "react/jsx-runtime";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function App() {
   const [port, setPort] = React.useState(null);
   const [running, setRunning] = React.useState(false);
@@ -967,6 +984,18 @@ function App() {
   const [result, setResult] = React.useState(null);
   const [error2, setError] = React.useState("");
   const eventsRef = React.useRef([]);
+  const [storedParams, setStoredParams] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem("wms-network-params");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const handleClear = () => {
+    localStorage.removeItem("wms-network-params");
+    setStoredParams(null);
+  };
   const logEndRef = React.useRef(null);
   const addEvent = React.useCallback((evt) => {
     eventsRef.current = [...eventsRef.current, evt];
@@ -1032,88 +1061,113 @@ function App() {
   };
   return /* @__PURE__ */ jsxs("div", { className: "max-w-3xl mx-auto p-4 space-y-4", children: [
     /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-emerald-400", children: "WMS Network Parameters Discovery" }),
-    /* @__PURE__ */ jsx(StepCard, { number: 1, title: "Connect the USB stick", status: stepStatus("connect"), children: step === "connect" ? /* @__PURE__ */ jsx(
-      "button",
-      {
-        onClick: handleConnect,
-        className: "px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors",
-        children: "Connect USB Stick"
-      }
-    ) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx("span", { children: "\u2713" }),
-      /* @__PURE__ */ jsx("span", { children: "Stick connected" })
-    ] }) }),
-    stepStatus("paired") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 2, title: "Enable discovery mode on the remote", status: stepStatus("paired"), children: step === "paired" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-      /* @__PURE__ */ jsxs("p", { children: [
-        "Long-press the ",
-        /* @__PURE__ */ jsx("strong", { children: "L" }),
-        " button on your remote until the LED blinks."
-      ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-400", children: [
-        /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-emerald-400 rounded-full animate-pulse" }),
-        "Listening for remote..."
-      ] })
-    ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx("span", { children: "\u2713" }),
-      /* @__PURE__ */ jsx("span", { children: "Remote detected" })
-    ] }) }),
-    stepStatus("press-a") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 3, title: "Connect the remote to the USB stick", status: stepStatus("press-a"), children: step === "press-a" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-      /* @__PURE__ */ jsxs("p", { children: [
-        "Wait for the ",
-        /* @__PURE__ */ jsx("strong", { children: "wifi" }),
-        " LED on your remote to turn solid red, then press the ",
-        /* @__PURE__ */ jsx("strong", { children: "A" }),
-        " button."
-      ] }),
-      /* @__PURE__ */ jsxs("div", { className: "bg-gray-800 rounded p-3 text-sm text-gray-400 border border-gray-700", children: [
-        /* @__PURE__ */ jsx("strong", { className: "text-yellow-400", children: "Tip:" }),
-        " If nothing happens, press",
-        " ",
-        /* @__PURE__ */ jsx("strong", { children: "C" }),
-        ", wait for the LED to stop blinking, then press",
-        " ",
-        /* @__PURE__ */ jsx("strong", { children: "A" }),
-        " again. Repeat until the next step appears."
-      ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-500", children: [
-        /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-blue-400 rounded-full animate-pulse" }),
-        "Waiting for wave request..."
-      ] })
-    ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx("span", { children: "\u2713" }),
-      /* @__PURE__ */ jsx("span", { children: "Wave request received" })
-    ] }) }),
-    stepStatus("press-stop") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 4, title: "Extract network parameters", status: stepStatus("press-stop"), children: step === "press-stop" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-      /* @__PURE__ */ jsxs("p", { children: [
-        "Press the ",
-        /* @__PURE__ */ jsx("strong", { children: "STOP" }),
-        " button on your remote."
-      ] }),
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-500", children: [
-        /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-purple-400 rounded-full animate-pulse" }),
-        "Waiting for key exchange..."
-      ] })
-    ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
-      /* @__PURE__ */ jsx("span", { children: "\u2713" }),
-      /* @__PURE__ */ jsx("span", { children: "Pairing complete" })
-    ] }) }),
-    result && /* @__PURE__ */ jsxs("div", { className: "border-2 border-yellow-500 rounded-lg p-4 bg-yellow-500/10 space-y-3", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-yellow-400 font-bold text-lg", children: "Network Parameters Discovered!" }),
+    storedParams ? /* @__PURE__ */ jsxs("div", { className: "border-2 border-emerald-500 rounded-lg p-4 bg-emerald-500/10 space-y-3", children: [
+      /* @__PURE__ */ jsx("div", { className: "text-emerald-400 font-bold text-lg", children: "Network Parameters Configured" }),
       /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm", children: [
         /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "PAN ID:" }),
-        /* @__PURE__ */ jsx("span", { className: "font-semibold", children: result.panId }),
+        /* @__PURE__ */ jsx("span", { className: "font-semibold", children: storedParams.panId }),
         /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Channel:" }),
-        /* @__PURE__ */ jsx("span", { className: "font-semibold", children: result.channel }),
+        /* @__PURE__ */ jsx("span", { className: "font-semibold", children: storedParams.channel }),
         /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Key:" }),
-        /* @__PURE__ */ jsx("span", { className: "font-mono text-yellow-300 break-all", children: result.key })
+        /* @__PURE__ */ jsx("span", { className: "font-mono text-emerald-300 break-all", children: storedParams.key })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "bg-emerald-900/40 border border-emerald-700 rounded p-3 text-sm text-emerald-300", children: [
-        "Short-press the ",
-        /* @__PURE__ */ jsx("strong", { children: "L" }),
-        " button on your remote to return it to normal operation."
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleClear,
+          className: "px-4 py-3 bg-red-700 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors",
+          children: "Clear and restart discovery"
+        }
+      ),
+      /* @__PURE__ */ jsxs("div", { className: "bg-gray-800/60 border border-gray-700 rounded p-3 text-sm text-gray-400", children: [
+        "Go back to the ",
+        /* @__PURE__ */ jsx("a", { href: "/", className: "text-emerald-400 hover:text-emerald-300 underline", children: "home page" }),
+        " to use these settings."
       ] })
+    ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(StepCard, { number: 1, title: "Connect the USB stick", status: stepStatus("connect"), children: step === "connect" ? /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleConnect,
+          className: "px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-sm transition-colors",
+          children: "Connect USB Stick"
+        }
+      ) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { children: "\u2713" }),
+        /* @__PURE__ */ jsx("span", { children: "Stick connected" })
+      ] }) }),
+      stepStatus("paired") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 2, title: "Enable discovery mode on the remote", status: stepStatus("paired"), children: step === "paired" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsxs("p", { children: [
+          "Long-press the ",
+          /* @__PURE__ */ jsx("strong", { children: "L" }),
+          " button on your remote until the LED blinks."
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-400", children: [
+          /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-emerald-400 rounded-full animate-pulse" }),
+          "Listening for remote..."
+        ] })
+      ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { children: "\u2713" }),
+        /* @__PURE__ */ jsx("span", { children: "Remote detected" })
+      ] }) }),
+      stepStatus("press-a") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 3, title: "Connect the remote to the USB stick", status: stepStatus("press-a"), children: step === "press-a" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsxs("p", { children: [
+          "Wait for the ",
+          /* @__PURE__ */ jsx("strong", { children: "wifi" }),
+          " LED on your remote to turn solid red, then press the ",
+          /* @__PURE__ */ jsx("strong", { children: "A" }),
+          " button."
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "bg-gray-800 rounded p-3 text-sm text-gray-400 border border-gray-700", children: [
+          /* @__PURE__ */ jsx("strong", { className: "text-yellow-400", children: "Tip:" }),
+          " If nothing happens, press",
+          " ",
+          /* @__PURE__ */ jsx("strong", { children: "C" }),
+          ", wait for the LED to stop blinking, then press",
+          " ",
+          /* @__PURE__ */ jsx("strong", { children: "A" }),
+          " again. Repeat until the next step appears."
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-500", children: [
+          /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-blue-400 rounded-full animate-pulse" }),
+          "Waiting for wave request..."
+        ] })
+      ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { children: "\u2713" }),
+        /* @__PURE__ */ jsx("span", { children: "Wave request received" })
+      ] }) }),
+      stepStatus("press-stop") !== "pending" && /* @__PURE__ */ jsx(StepCard, { number: 4, title: "Extract network parameters", status: stepStatus("press-stop"), children: step === "press-stop" ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsxs("p", { children: [
+          "Press the ",
+          /* @__PURE__ */ jsx("strong", { children: "STOP" }),
+          " button on your remote."
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-sm text-gray-500", children: [
+          /* @__PURE__ */ jsx("span", { className: "w-2 h-2 bg-purple-400 rounded-full animate-pulse" }),
+          "Waiting for key exchange..."
+        ] })
+      ] }) : /* @__PURE__ */ jsxs("div", { className: "text-emerald-400 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { children: "\u2713" }),
+        /* @__PURE__ */ jsx("span", { children: "Pairing complete" })
+      ] }) }),
+      result && /* @__PURE__ */ jsxs("div", { className: "border-2 border-yellow-500 rounded-lg p-4 bg-yellow-500/10 space-y-3", children: [
+        /* @__PURE__ */ jsx("div", { className: "text-yellow-400 font-bold text-lg", children: "Network Parameters Discovered!" }),
+        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm", children: [
+          /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "PAN ID:" }),
+          /* @__PURE__ */ jsx("span", { className: "font-semibold", children: result.panId }),
+          /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Channel:" }),
+          /* @__PURE__ */ jsx("span", { className: "font-semibold", children: result.channel }),
+          /* @__PURE__ */ jsx("span", { className: "text-gray-400", children: "Key:" }),
+          /* @__PURE__ */ jsx("span", { className: "font-mono text-yellow-300 break-all", children: result.key })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "bg-emerald-900/40 border border-emerald-700 rounded p-3 text-sm text-emerald-300", children: [
+          "Short-press the ",
+          /* @__PURE__ */ jsx("strong", { children: "L" }),
+          " button on your remote to return it to normal operation."
+        ] })
+      ] }),
+      error2 && step !== "complete" && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: error2 })
     ] }),
-    error2 && step !== "complete" && /* @__PURE__ */ jsx("div", { className: "bg-red-900/30 border border-red-700 rounded p-3 text-sm text-red-400", children: error2 }),
     /* @__PURE__ */ jsxs("details", { className: "text-sm", children: [
       /* @__PURE__ */ jsx("summary", { className: "text-gray-500 cursor-pointer hover:text-gray-300 transition-colors", children: "Technical Details" }),
       /* @__PURE__ */ jsxs("div", { className: "bg-gray-900 rounded-lg p-3 mt-2 h-64 overflow-y-auto leading-relaxed", children: [
