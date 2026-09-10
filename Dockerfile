@@ -1,4 +1,4 @@
-FROM node:26.5.0-slim AS base
+FROM node:26.8.2-slim AS base
 WORKDIR /app
 
 COPY package.json package-lock.json .npmrc ./
